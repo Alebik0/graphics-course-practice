@@ -157,6 +157,7 @@ int main() try
 
     GLuint viewmodel_location = glGetUniformLocation(program, "viewmodel");
     GLuint projection_location = glGetUniformLocation(program, "projection");
+    GLuint textureSampler_location = glGetUniformLocation(program, "textureSampler");
 
     std::string project_root = PROJECT_ROOT;
     std::string cow_texture_path = project_root + "/cow.png";
@@ -193,8 +194,12 @@ int main() try
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, cow.indices.size() * sizeof(std::uint32_t), cow.indices.data(), GL_STATIC_DRAW);
 
     // Load texture:
-    GLuint textureID;
-    glGenTextures(1, &textureID);
+    GLuint textureID[2];
+    glGenTextures(2, textureID);
+
+    // Image texture
+    int texture_width, texture_height, texture_cpx;
+    unsigned char * texture_pixels = stbi_load(cow_texture_path.c_str(), &texture_width, &texture_height, &texture_cpx, 4);
     
     // Test texture
     const int size = 512;
@@ -217,9 +222,7 @@ int main() try
             blue[j * (size / 8) + i] = 0xFF0000FFu;
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-
-    glUniform1i(glGetUniformLocation(program, "textureSampler"), 0);
+    glBindTexture(GL_TEXTURE_2D, textureID[0]);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
@@ -229,6 +232,17 @@ int main() try
     glTexImage2D(GL_TEXTURE_2D, 1, GL_RGBA8, size / 2, size / 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, red.data());
     glTexImage2D(GL_TEXTURE_2D, 2, GL_RGBA8, size / 4, size / 4, 0, GL_RGBA, GL_UNSIGNED_BYTE, green.data());
     glTexImage2D(GL_TEXTURE_2D, 3, GL_RGBA8, size / 8, size / 8, 0, GL_RGBA, GL_UNSIGNED_BYTE, blue.data());
+    
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, textureID[1]);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 3);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_pixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    stbi_image_free(texture_pixels);  
 
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
@@ -304,6 +318,7 @@ int main() try
         glUseProgram(program);
         glUniformMatrix4fv(viewmodel_location, 1, GL_TRUE, viewmodel);
         glUniformMatrix4fv(projection_location, 1, GL_TRUE, projection);
+        glUniform1i(textureSampler_location, 1);
 
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, cow.indices.size(), GL_UNSIGNED_INT, (void *)(0));
