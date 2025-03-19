@@ -78,10 +78,19 @@ uniform vec3 point_light_position;
 uniform vec3 point_light_color;
 uniform vec3 point_light_attenuation;
 
+uniform float glossiness;
+uniform float roughness;
+
 in vec3 position;
 in vec3 normal;
 
 layout (location = 0) out vec4 out_color;
+
+vec3 specular(vec3 direction)
+{
+    float power = 1 / roughness / roughness - 1;
+    return glossiness * albedo * pow(max(0.0, dot(normal, direction)), power);
+}
 
 vec3 diffuse(vec3 direction)
 {
@@ -96,7 +105,7 @@ void main()
     float distance = length(position - point_light_position);
     float light_attenuation = 1 / (point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z);
     vec3 light_vector = normalize(position - point_light_position);
-    vec3 light_color = diffuse(-light_vector) * light_attenuation * point_light_color;
+    vec3 light_color = (diffuse(-light_vector) + specular(-light_vector)) * light_attenuation * point_light_color;
 
     vec3 color = ambient_color + sun_color + light_color;
     
@@ -191,6 +200,8 @@ int main() try {
     GLuint point_light_position_location = glGetUniformLocation(program, "point_light_position");
     GLuint point_light_color_location = glGetUniformLocation(program, "point_light_color");
     GLuint point_light_attenuation_location = glGetUniformLocation(program, "point_light_attenuation");
+    GLuint glossiness_location = glGetUniformLocation(program, "glossiness");
+    GLuint roughness_location = glGetUniformLocation(program, "roughness");
 
     std::string project_root = PROJECT_ROOT;
     std::string suzanne_model_path = project_root + "/suzanne.obj";
@@ -309,6 +320,8 @@ int main() try {
         glUniform3f(point_light_position_location, -0.5f, 0.5f, 1.f);
         glUniform3f(point_light_color_location, 0.f, 1.f, 0.f);
         glUniform3f(point_light_attenuation_location, 1.f, 0.f, 0.01f);
+        glUniform1f(glossiness_location, 5.0f);
+        glUniform1f(roughness_location, 0.1f);
 
         glBindVertexArray(suzanne_vao);
         glDrawElements(GL_TRIANGLES, suzanne.indices.size(), GL_UNSIGNED_INT, nullptr);
