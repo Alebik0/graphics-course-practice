@@ -123,9 +123,12 @@ in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
+uniform sampler2D render_result;
+
 void main()
 {
-    out_color = vec4(texcoord, 0.0, 1.0);
+    vec3 albedo = texture(render_result, texcoord).rgb;
+    out_color = vec4(albedo, 1.0);
 }
 )";
 
@@ -246,6 +249,7 @@ int main() try
 
     GLuint center_location = glGetUniformLocation(rectangle_program, "center");
     GLuint size_location = glGetUniformLocation(rectangle_program, "size");
+    GLuint render_result_location = glGetUniformLocation(rectangle_program, "render_result");
 
     // Rectangle obj
     GLuint rectangle_vao;
@@ -340,12 +344,6 @@ int main() try
         if (button_down[SDLK_RIGHT])
             model_angle += 2.f * dt;
 
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
-        glViewport(0, 0, width, height);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-
         float near = 0.1f;
         float far = 100.f;
 
@@ -362,6 +360,12 @@ int main() try
         glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
 
         // Draw dragon
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+        glViewport(0, 0, width / 2, height / 2);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+
         glUseProgram(dragon_program);
         glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
         glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
@@ -372,13 +376,20 @@ int main() try
         glBindVertexArray(dragon_vao);
         glDrawElements(GL_TRIANGLES, dragon.indices.size(), GL_UNSIGNED_INT, nullptr);
 
+        // Draw rectangle
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        // Draw rectangle
+
         glUseProgram(rectangle_program);
+
         glUniform2f(center_location, -0.5f, -0.5f);
         glUniform2f(size_location, 0.5f, 0.5f);
+        glUniform1i(render_result_location, 0);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, textureID);
+
         glBindVertexArray(rectangle_vao);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
