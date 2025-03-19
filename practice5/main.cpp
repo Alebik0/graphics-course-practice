@@ -41,13 +41,16 @@ uniform mat4 projection;
 
 layout (location = 0) in vec3 in_position;
 layout (location = 1) in vec3 in_normal;
+layout (location = 2) in vec2 in_texcoord;
 
 out vec3 normal;
+out vec2 texcoord;
 
 void main()
 {
     gl_Position = projection * viewmodel * vec4(in_position, 1.0);
     normal = mat3(viewmodel) * in_normal;
+    texcoord = in_texcoord;
 }
 )";
 
@@ -55,13 +58,14 @@ const char fragment_shader_source[] =
 R"(#version 330 core
 
 in vec3 normal;
+in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
 void main()
 {
     float lightness = 0.5 + 0.5 * dot(normalize(normal), normalize(vec3(1.0, 2.0, 3.0)));
-    vec3 albedo = vec3(1.0);
+    vec3 albedo = vec3(texcoord, 0.0);
     out_color = vec4(lightness * albedo, 1.0);
 }
 )";
@@ -162,6 +166,7 @@ int main() try
     // VBO settings:
     const int position_index = 0;
     const int normal_index = 1;
+    const int texcoord_index = 2;
 
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
@@ -171,8 +176,10 @@ int main() try
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glEnableVertexAttribArray(position_index);
     glEnableVertexAttribArray(normal_index);
+    glEnableVertexAttribArray(texcoord_index);
     glVertexAttribPointer(position_index, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void *)(0));
     glVertexAttribPointer(normal_index, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void *)(sizeof(std::array<float, 3>)));
+    glVertexAttribPointer(texcoord_index, 2, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void *)(sizeof(std::array<float, 3>) + sizeof(std::array<float, 3>)));
 
     // Set up buffer data:
     glBindVertexArray(vao);
