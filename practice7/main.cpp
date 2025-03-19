@@ -183,8 +183,6 @@ int main() try {
     if (!GLEW_VERSION_3_3)
         throw std::runtime_error("OpenGL 3.3 is not supported");
 
-    glClearColor(0.8f, 0.8f, 1.f, 0.f);
-
     auto vertex_shader = create_shader(GL_VERTEX_SHADER, vertex_shader_source);
     auto fragment_shader = create_shader(GL_FRAGMENT_SHADER, fragment_shader_source);
     auto program = create_program(vertex_shader, fragment_shader);
@@ -292,6 +290,16 @@ int main() try {
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
+
+        if (transparent) {
+            glEnable(GL_BLEND);
+            glBlendEquation(GL_FUNC_ADD);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glClearColor(0.8f, 0.8f, 1.f, 0.f);
+        } else {
+            glDisable(GL_BLEND);
+            glClearColor(0.1f, 0.8f, 0.8f, 0.f);
+        }
 
         float near = 0.1f;
         float far = 100.f;
