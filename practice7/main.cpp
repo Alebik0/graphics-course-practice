@@ -70,8 +70,13 @@ const char fragment_shader_source[] =
 uniform vec3 camera_position;
 uniform vec3 albedo;
 uniform vec3 ambient_light;
+
 uniform vec3 sun_direction;
 uniform vec3 sun_color;
+
+uniform vec3 point_light_position;
+uniform vec3 point_light_color;
+uniform vec3 point_light_attenuation;
 
 in vec3 position;
 in vec3 normal;
@@ -85,7 +90,16 @@ vec3 diffuse(vec3 direction)
 
 void main()
 {
-    vec3 color = albedo * ambient_light + diffuse(sun_direction) * sun_color;
+    vec3 ambient_color = albedo * ambient_light;
+    vec3 sun_color = diffuse(sun_direction) * sun_color;
+ 
+    float distance = length(position - point_light_position);
+    float light_attenuation = 1 / (point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z);
+    vec3 light_vector = normalize(position - point_light_position);
+    vec3 light_color = diffuse(-light_vector) * light_attenuation * point_light_color;
+
+    vec3 color = ambient_color + sun_color + light_color;
+    
     out_color = vec4(color, 1.0);
 }
 )";
@@ -174,6 +188,9 @@ int main() try {
     GLuint ambient_light_location = glGetUniformLocation(program, "ambient_light");
     GLuint sun_direction_location = glGetUniformLocation(program, "sun_direction");
     GLuint sun_color_location = glGetUniformLocation(program, "sun_color");
+    GLuint point_light_position_location = glGetUniformLocation(program, "point_light_position");
+    GLuint point_light_color_location = glGetUniformLocation(program, "point_light_color");
+    GLuint point_light_attenuation_location = glGetUniformLocation(program, "point_light_attenuation");
 
     std::string project_root = PROJECT_ROOT;
     std::string suzanne_model_path = project_root + "/suzanne.obj";
@@ -289,6 +306,9 @@ int main() try {
         glUniform3f(ambient_light_location, 0.2f, 0.2f, 0.2f);
         glUniform3f(sun_direction_location, 0.5f, 0.0f, 0.87f);
         glUniform3f(sun_color_location, 1.0f, 0.9f, 0.8f);
+        glUniform3f(point_light_position_location, -0.5f, 0.5f, 1.f);
+        glUniform3f(point_light_color_location, 0.f, 1.f, 0.f);
+        glUniform3f(point_light_attenuation_location, 1.f, 0.f, 0.01f);
 
         glBindVertexArray(suzanne_vao);
         glDrawElements(GL_TRIANGLES, suzanne.indices.size(), GL_UNSIGNED_INT, nullptr);
