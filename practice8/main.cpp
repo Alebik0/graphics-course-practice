@@ -105,6 +105,40 @@ void main()
 }
 )";
 
+const char vertex_shader_preview[] =
+    R"(#version 330 core
+out vec2 texcoord;
+
+const vec2 VERTICES[6] = vec2[6](
+vec2(-1.0, -1.0),
+vec2(-0.5, -1.0),
+vec2(-1.0, -0.5),
+vec2(-0.5, -1.0),
+vec2(-0.5, -0.5),
+vec2(-1.0, -0.5)
+);
+
+void main()
+{
+    gl_Position = vec4(VERTICES[gl_VertexID], 0.0, 1.0);
+    texcoord = (VERTICES[gl_VertexID] + 1) * 2;
+}
+)";
+
+const char fragment_shader_preview[] =
+    R"(#version 330 core
+uniform sampler2D preview_texture;
+
+in vec2 texcoord;
+
+layout (location = 0) out vec4 out_color;
+
+void main()
+{
+    out_color = vec4(texture(preview_texture, texcoord).r);
+}
+)";
+
 GLuint create_shader(GLenum type, const char *source)
 {
     GLuint result = glCreateShader(type);
@@ -241,6 +275,15 @@ try
         std::cout << "Shadowmap fbo initialised" << std::endl;
     }
 
+    // Init preview
+    auto preview_vs = create_shader(GL_VERTEX_SHADER, vertex_shader_preview);
+    auto preview_fs = create_shader(GL_FRAGMENT_SHADER, fragment_shader_preview);
+    auto preview_program = create_program(preview_vs, preview_fs);
+    
+    GLuint preview_vao;
+    glGenVertexArrays(1, &preview_vao);
+    glBindVertexArray(preview_vao);
+
     // Event loop
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
@@ -295,13 +338,6 @@ try
         if (button_down[SDLK_RIGHT])
             camera_angle -= 2.f * dt;
 
-        glViewport(0, 0, width, height);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glClearColor(0.8f, 0.8f, 1.f, 0.f);
-
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-
         float near = 0.1f;
         float far = 100.f;
 
@@ -320,7 +356,16 @@ try
 
         glm::vec3 sun_direction = glm::normalize(glm::vec3(std::sin(time * 0.5f), 2.f, std::cos(time * 0.5f)));
 
+        // Draw scene
         glUseProgram(program);
+
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glViewport(0, 0, width, height);
+        glClearColor(0.8f, 0.8f, 1.f, 0.f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
 
         glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
         glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
@@ -332,6 +377,16 @@ try
 
         glBindVertexArray(scene_vao);
         glDrawElements(GL_TRIANGLES, scene.indices.size(), GL_UNSIGNED_INT, nullptr);
+        
+        // Draw preview
+        glUseProgram(preview_program);
+
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glViewport(0, 0, width, height);
+        glDisable(GL_DEPTH_TEST);
+
+        glBindVertexArray(preview_vao);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         SDL_GL_SwapWindow(window);
     }
