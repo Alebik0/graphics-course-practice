@@ -195,21 +195,40 @@ int main() try
     // Load texture:
     GLuint textureID;
     glGenTextures(1, &textureID);
-
+    
+    // Test texture
     const int size = 512;
     std::vector<std::uint32_t> pixels(size * size);
+    std::vector<std::uint32_t> red((size / 2) * (size / 2));
+    std::vector<std::uint32_t> green((size / 4) * (size / 4));
+    std::vector<std::uint32_t> blue((size / 8) * (size / 8));
     
     for (int i = 0; i < size; i++)
         for (int j = 0; j < size; j++)
             pixels[j * size + i] = (i + j) % 2 == 0 ? 0xFF000000u : 0xFFFFFFFFu;
+    for (int i = 0; i < size / 2; i++)
+        for (int j = 0; j < size / 2; j++)
+            red[j * (size / 2) + i] = 0xFFFF0000u;
+    for (int i = 0; i < size / 4; i++)
+        for (int j = 0; j < size / 4; j++)
+            green[j * (size / 4) + i] = 0xFF00FF00u;
+    for (int i = 0; i < size / 8; i++)
+        for (int j = 0; j < size / 8; j++)
+            blue[j * (size / 8) + i] = 0xFF0000FFu;
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
     glUniform1i(glGetUniformLocation(program, "textureSampler"), 0);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 3);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, size    , size    , 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glTexImage2D(GL_TEXTURE_2D, 1, GL_RGBA8, size / 2, size / 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, red.data());
+    glTexImage2D(GL_TEXTURE_2D, 2, GL_RGBA8, size / 4, size / 4, 0, GL_RGBA, GL_UNSIGNED_BYTE, green.data());
+    glTexImage2D(GL_TEXTURE_2D, 3, GL_RGBA8, size / 8, size / 8, 0, GL_RGBA, GL_UNSIGNED_BYTE, blue.data());
 
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
