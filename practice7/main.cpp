@@ -232,7 +232,7 @@ int main() try {
 
     bool transparent = false;
 
-    float camera_distance = 3.f;
+    float camera_distance = 5.f;
     float camera_x = 0.f;
     float camera_angle = 0.f;
 
@@ -301,38 +301,43 @@ int main() try {
             glClearColor(0.1f, 0.8f, 0.8f, 0.f);
         }
 
-        float near = 0.1f;
-        float far = 100.f;
-
-        glm::mat4 model(1.f);
-
-        glm::mat4 view(1.f);
-        view = glm::translate(view, {0.f, 0.f, -camera_distance});
-        view = glm::rotate(view, camera_angle, {0.f, 1.f, 0.f});
-        view = glm::translate(view, {-camera_x, 0.f, 0.f});
-
-        float aspect = (float)height / (float)width;
-        glm::mat4 projection = glm::perspective(glm::pi<float>() / 3.f, (width * 1.f) / height, near, far);
-
-        glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
-
-        glUseProgram(program);
-        glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-        glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
-        glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
-        glUniform3fv(camera_position_location, 1, (float *) (&camera_position));
-        glUniform3f(albedo_location, 0.7f, 0.4f, 0.2f);
-        glUniform3f(ambient_light_location, 0.2f, 0.2f, 0.2f);
-        glUniform3f(sun_direction_location, 0.5f, 0.0f, 0.87f);
-        glUniform3f(sun_color_location, 1.0f, 0.9f, 0.8f);
-        glUniform3f(point_light_position_location, -0.5f, 0.5f, 1.f);
-        glUniform3f(point_light_color_location, 0.f, 1.f, 0.f);
-        glUniform3f(point_light_attenuation_location, 1.f, 0.f, 0.01f);
-        glUniform1f(glossiness_location, 5.0f);
-        glUniform1f(roughness_location, 0.1f);
-
-        glBindVertexArray(suzanne_vao);
-        glDrawElements(GL_TRIANGLES, suzanne.indices.size(), GL_UNSIGNED_INT, nullptr);
+        for (int x = 0; x < 3; x++) {
+            for (int y = 0; y < 3; y++) {
+                float near = 0.1f;
+                float far = 100.f;
+        
+                glm::mat4 model(1.f);
+                model = glm::translate(model, {(1.f - x) * 2.f, (1.f - y) * 2.f, 0.f});
+        
+                glm::mat4 view(1.f);
+                view = glm::translate(view, {0.f, 0.f, -camera_distance});
+                view = glm::rotate(view, camera_angle, {0.f, 1.f, 0.f});
+                view = glm::translate(view, {-camera_x, 0.f, 0.f});
+        
+                float aspect = (float)height / (float)width;
+                glm::mat4 projection = glm::perspective(glm::pi<float>() / 3.f, (width * 1.f) / height, near, far);
+        
+                glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
+        
+                glUseProgram(program);
+                glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
+                glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
+                glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+                glUniform3fv(camera_position_location, 1, (float *) (&camera_position));
+                glUniform3f(albedo_location, 0.7f, 0.4f, 0.2f);
+                glUniform3f(ambient_light_location, 0.2f, 0.2f, 0.2f);
+                glUniform3f(sun_direction_location, 0.5f, 0.0f, 0.87f);
+                glUniform3f(sun_color_location, 1.0f, 0.9f, 0.8f);
+                glUniform3f(point_light_position_location, 0.f, 0.f, 2.f);
+                glUniform3f(point_light_color_location, 0.f, 1.f, 0.f);
+                glUniform3f(point_light_attenuation_location, 1.f, 0.f, 0.01f);
+                glUniform1f(glossiness_location, 5.0f);
+                glUniform1f(roughness_location, 0.05f * (1 - 3 * x - y));
+        
+                glBindVertexArray(suzanne_vao);
+                glDrawElements(GL_TRIANGLES, suzanne.indices.size(), GL_UNSIGNED_INT, nullptr);
+            }
+        }
 
         SDL_GL_SwapWindow(window);
     }
