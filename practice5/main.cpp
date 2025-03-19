@@ -62,10 +62,12 @@ in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
+uniform sampler2D textureSampler;
+
 void main()
 {
     float lightness = 0.5 + 0.5 * dot(normalize(normal), normalize(vec3(1.0, 2.0, 3.0)));
-    vec3 albedo = vec3(texcoord, 0.0);
+    vec3 albedo = texture(textureSampler, texcoord).rgb;
     out_color = vec4(lightness * albedo, 1.0);
 }
 )";
@@ -156,10 +158,12 @@ int main() try
     GLuint viewmodel_location = glGetUniformLocation(program, "viewmodel");
     GLuint projection_location = glGetUniformLocation(program, "projection");
 
-    // Load object
     std::string project_root = PROJECT_ROOT;
     std::string cow_texture_path = project_root + "/cow.png";
-    obj_data cow = parse_obj(project_root + "/cow.obj");
+    std::string cow_object_path = project_root + "/cow.obj";
+
+    // Load object
+    obj_data cow = parse_obj(cow_object_path);
 
     GLuint vao, vbo, ebo;
 
@@ -187,6 +191,25 @@ int main() try
     glBufferData(GL_ARRAY_BUFFER, cow.vertices.size() * sizeof(obj_data::vertex), cow.vertices.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, cow.indices.size() * sizeof(std::uint32_t), cow.indices.data(), GL_STATIC_DRAW);
+
+    // Load texture:
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+
+    const int size = 512;
+    std::vector<std::uint32_t> pixels(size * size);
+    
+    for (int i = 0; i < size; i++)
+        for (int j = 0; j < size; j++)
+            pixels[j * size + i] = (i + j) % 2 == 0 ? 0xFF000000u : 0xFFFFFFFFu;
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glUniform1i(glGetUniformLocation(program, "textureSampler"), 0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
