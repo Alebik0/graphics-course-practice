@@ -124,11 +124,34 @@ in vec2 texcoord;
 layout (location = 0) out vec4 out_color;
 
 uniform sampler2D render_result;
+uniform int mode;
+uniform float time;
 
 void main()
 {
-    vec3 albedo = texture(render_result, texcoord).rgb;
-    out_color = vec4(albedo, 1.0);
+    if (mode == 1) {
+        vec3 color = texture(render_result, texcoord).rgb;
+        out_color = vec4(floor(color * 4.0) / 3.0, 1.0);
+    } else if (mode == 2) {
+        vec2 offset = vec2(sin(texcoord.y * 50.0 + time) * 0.01, 0.0);
+        out_color = vec4(texture(render_result, texcoord + offset).rgb, 1.0);
+    } else if (mode == 3) {
+        vec4 sum = vec4(0.0);
+        float sum_w = 0.0;
+        const int N = 5;
+        float radius = 10.0;
+        for (int x = -N; x <= N; ++x) {
+            for (int y = -N; y <= N; ++y) {
+                vec2 offset = vec2(x, y) / vec2(textureSize(render_result, 0));
+                float c = exp(-float(x*x + y*y) / (radius*radius));
+                sum += c * texture(render_result, texcoord + offset);
+                sum_w += c;
+            }
+        }
+        out_color = sum / sum_w;
+    } else {
+        out_color = vec4(texture(render_result, texcoord).rgb, 1.0);
+    }
 }
 )";
 
@@ -248,6 +271,8 @@ int main() try
     GLuint center_location = glGetUniformLocation(rectangle_program, "center");
     GLuint size_location = glGetUniformLocation(rectangle_program, "size");
     GLuint render_result_location = glGetUniformLocation(rectangle_program, "render_result");
+    GLuint mode_location = glGetUniformLocation(rectangle_program, "mode");
+    GLuint time_location = glGetUniformLocation(rectangle_program, "time");
 
     // Rectangle obj
     GLuint rectangle_vao;
@@ -378,7 +403,7 @@ int main() try
 
             glm::mat4 model(1.f);
             model = glm::rotate(model, model_angle, {0.f, 1.f, 0.f});
-            model = glm::scale(model, glm::vec3(model_scale));
+            model = glm::scale(model, glm::vec3(2 * model_scale));
 
             glm::mat4 view(1.f);
             view = glm::translate(view, {0.f, 0.f, -camera_distance});
@@ -401,7 +426,7 @@ int main() try
 
             glm::mat4 model(1.f);
             model = glm::rotate(model, model_angle, {0.f, 1.f, 0.f});
-            model = glm::scale(model, glm::vec3(model_scale));
+            model = glm::scale(model, glm::vec3(2 * model_scale));
 
             glm::mat4 view(1.f);
             view = glm::translate(view, {0.f, 0.f, -camera_distance});
@@ -424,7 +449,7 @@ int main() try
 
             glm::mat4 model(1.f);
             model = glm::rotate(model, model_angle, {0.f, 1.f, 0.f});
-            model = glm::scale(model, glm::vec3(model_scale));
+            model = glm::scale(model, glm::vec3(2 * model_scale));
 
             glm::mat4 view(1.f);
             view = glm::translate(view, {0.f, 0.f, -camera_distance});
@@ -481,6 +506,8 @@ int main() try
             glUniform2f(center_location, 0.5f * (2 * x - 1), 0.5f * (2 * y - 1));
             glUniform2f(size_location, 0.5f, 0.5f);
             glUniform1i(render_result_location, 0);
+            glUniform1i(mode_location, dragonN + 1);
+            glUniform1f(time_location, time);
 
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, textureID);
