@@ -391,8 +391,8 @@ try
         float near = 0.1f;
         float far = 100.f;
 
-        glm::vec3 light_Z = glm::vec3(0, -1, 0);
-        glm::vec3 light_X = glm::vec3(1, 0, 0);
+        glm::vec3 light_Z = -glm::normalize(glm::vec3(std::sin(time * 0.5f), 2.f, std::cos(time * 0.5f)));;
+        glm::vec3 light_X = glm::normalize(glm::vec3(std::sin(time * 0.5f), 0.5f, std::cos(time * 0.5f)));
         glm::vec3 light_Y = glm::cross(light_X, light_Z);
         glm::mat4 shadowmap_projection = glm::mat4(glm::transpose(glm::mat3(light_X, light_Y, light_Z)));
 
