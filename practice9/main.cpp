@@ -92,8 +92,10 @@ void main()
     vec2 data = texture(shadow_map, shadow_pos.xy).rg;
     float mu = data.r;
     float sigma = data.g - mu * mu;
-    float z = shadow_pos.z;
-    float shadow_factor = (z < mu) ? 1.0 : sigma / (sigma + (z - mu) * (z - mu));
+    float z = shadow_pos.z - 0.01;
+    float factor = (z < mu) ? 1.0 : sigma / (sigma + (z - mu) * (z - mu));
+    float delta = 0.125;
+    float shadow_factor = factor < delta ? 0.0 : (factor - delta) / (1 - delta);
 
     vec3 albedo = vec3(1.0, 1.0, 1.0);
 
@@ -164,7 +166,7 @@ out vec4 shadow_output;
 void main()
 {
     float z = gl_FragCoord.z;
-    shadow_output = vec4(z, z * z, 0.0, 0.0);
+    shadow_output = vec4(z, z * z + 1.0 / 4 * (dFdx(z) * dFdx(z) + dFdy(z) * dFdy(z)), 0, 0);
 }
 )";
 
@@ -303,13 +305,6 @@ int main() try
         (max_bouding_box_y + min_bouding_box_y) / 2,
         (max_bouding_box_z + min_bouding_box_z) / 2
     );
-
-    std::cout << min_bouding_box_x << " " <<
-        min_bouding_box_y << " " <<
-        min_bouding_box_z << " " <<
-        max_bouding_box_x << " " <<
-        max_bouding_box_y << " " <<
-        max_bouding_box_z << " " << std::endl;
 
     GLuint vao, vbo, ebo;
     glGenVertexArrays(1, &vao);
