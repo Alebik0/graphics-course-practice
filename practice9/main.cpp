@@ -89,7 +89,19 @@ void main()
     shadow_pos /= shadow_pos.w;
     shadow_pos = shadow_pos * 0.5 + vec4(0.5);
 
-    vec2 data = texture(shadow_map, shadow_pos.xy).rg;
+    vec2 sum = vec2(0.0);
+    vec2 sum_w = vec2(0.0);
+    const int N = 5;
+    float radius = 10.0;
+    for (int x = -N; x <= N; ++x) {
+        for (int y = -N; y <= N; ++y) {
+            float c = exp(-float(x * x + y * y) / (radius*radius));
+            sum += c * texture(shadow_map, shadow_pos.xy + vec2(x,y) / vec2(textureSize(shadow_map, 0))).rg;
+            sum_w += c;
+        }
+    }
+    vec2 data = sum / sum_w;
+
     float mu = data.r;
     float sigma = data.g - mu * mu;
     float z = shadow_pos.z - 0.01;
