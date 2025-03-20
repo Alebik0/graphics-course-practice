@@ -163,15 +163,15 @@ int main() try
             exit(1);
         }
 
+        std::vector<std::vector<obj_data::vertex>> vertices_grouped_by_material(materials.size());
+
         // Loop over shapes
         for (size_t s = 0; s < shapes.size(); s++) {
             // Loop over faces(polygon)
             size_t index_offset = 0;
             for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-                obj_data::face_data current_face_data;
-                current_face_data.firstVertex = scene.vertices.size();
-
                 size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+                size_t material_idx = shapes[s].mesh.material_ids[f];
 
                 // Loop over vertices in the face.
                 for (size_t v = 0; v < fv; v++) {
@@ -195,23 +195,29 @@ int main() try
                         current_v.texcoord = { tx, };
                     }
 
-                    scene.vertices.push_back(current_v);
+                    vertices_grouped_by_material[material_idx].push_back(current_v);
                 }
                 index_offset += fv;
-
-                current_face_data.countVertex = scene.vertices.size() - current_face_data.firstVertex;
-
-                // per-face material
-                int material_idx = shapes[s].mesh.material_ids[f];
-                tinyobj::material_t material = materials.at(material_idx);
-                current_face_data.material_name = material.name;
-                current_face_data.albedo_texname = material.ambient_texname;
-                current_face_data.alpha_texname = material.alpha_texname;
-                current_face_data.glossiness = { material.specular[0], material.specular[1], material.specular[2] };
-                current_face_data.power = material.shininess;
-
-                scene.faces.push_back(current_face_data);
             }
+        }
+
+        for (size_t material_idx = 0; material_idx < materials.size(); material_idx++) {
+            obj_data::face_data current_face_data;
+            current_face_data.firstVertex = scene.vertices.size();
+            
+            for (obj_data::vertex v : vertices_grouped_by_material[material_idx]) {
+                scene.vertices.push_back(v);
+            }
+
+            tinyobj::material_t material = materials.at(material_idx);
+            current_face_data.countVertex = scene.vertices.size() - current_face_data.firstVertex;
+            current_face_data.material_name = material.name;
+            current_face_data.albedo_texname = material.ambient_texname;
+            current_face_data.alpha_texname = material.alpha_texname;
+            current_face_data.glossiness = { material.specular[0], material.specular[1], material.specular[2] };
+            current_face_data.power = material.shininess;
+
+            scene.faces.push_back(current_face_data);
         }
 
         std::cout << "Loaded:\n"
