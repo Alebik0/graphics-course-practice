@@ -2,7 +2,6 @@
 
 #include <array>
 #include <vector>
-#include <filesystem>
 
 struct obj_data
 {
@@ -14,7 +13,4 @@ struct obj_data
     };
 
     std::vector<vertex> vertices;
-    std::vector<std::uint32_t> indices;
 };
-
-obj_data parse_obj(std::filesystem::path const & path);

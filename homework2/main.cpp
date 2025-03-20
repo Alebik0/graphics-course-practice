@@ -144,9 +144,6 @@ int main() try
     obj_data scene;
     
     { // Load scene
-        scene = parse_obj(scene_path);
-
-        /*
         std::string inputfile = scene_path;
         std::string mtl_basedir = scene_dir;
         bool triangulate = true;
@@ -166,7 +163,9 @@ int main() try
             exit(1);
         }
 
-        std::cout << "Loaded " << shapes.size() << " shapes\n";
+        std::cout << "Loaded:\n"
+            << "- " << shapes.size() << " shapes\n"
+            << "- " << materials.size() << " materials\n";
         // Loop over shapes
         for (size_t s = 0; s < shapes.size(); s++) {
             // Loop over faces(polygon)
@@ -217,11 +216,6 @@ int main() try
                 shapes[s].mesh.material_ids[f];
             }
         }
-
-        for (int i = 0; i < scene.vertices.size(); i++) {
-            scene.indices.push_back(i);
-        }
-        */
     }
 
     { // Log obj info
@@ -246,13 +240,12 @@ int main() try
     
         std::cout << "Loaded scene" << "\n"
             << "Vertexes: " << scene.vertices.size() << '\n'
-            << "Indices: " << scene.indices.size() << '\n'
             << "Bouding box min: " << scene_bouding_box_min.x << ' ' << scene_bouding_box_min.y << ' ' << scene_bouding_box_min.z << '\n'
             << "Bouding box max: " << scene_bouding_box_max.x << ' ' << scene_bouding_box_max.y << ' ' << scene_bouding_box_max.z << '\n'
             << std::endl;
     }
 
-    GLuint vao, vbo, ebo, debug_vao;
+    GLuint vao, vbo, debug_vao;
     { // Init gl scene
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
@@ -261,15 +254,11 @@ int main() try
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, scene.vertices.size() * sizeof(scene.vertices[0]), scene.vertices.data(), GL_STATIC_DRAW);
 
-        glGenBuffers(1, &ebo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, scene.indices.size() * sizeof(scene.indices[0]), scene.indices.data(), GL_STATIC_DRAW);
-
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(0));
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(12));
-
+        
         glGenVertexArrays(1, &debug_vao);
     }
 
@@ -380,7 +369,7 @@ int main() try
             glUniform3f(source_program.sun_color_location, 1.0f, 0.9f, 0.8f);
     
             glBindVertexArray(vao);
-            glDrawElements(GL_TRIANGLES, scene.indices.size(), GL_UNSIGNED_INT, nullptr);
+            glDrawArrays(GL_TRIANGLES, 0, scene.vertices.size());
         }
 
         { // Draw debug
