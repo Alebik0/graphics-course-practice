@@ -77,6 +77,9 @@ uniform vec3 albedo;
 uniform vec3 sun_direction;
 uniform vec3 sun_color;
 
+uniform sampler2D shadowmap_texture;
+uniform mat4 shadowmap_projection;
+
 in vec3 position;
 in vec3 normal;
 
@@ -99,9 +102,26 @@ vec3 phong(vec3 direction) {
 
 void main()
 {
-    float ambient_light = 0.2;
-    vec3 color = albedo * ambient_light + sun_color * phong(sun_direction);
-    out_color = vec4(color, 1.0);
+    vec4 ndc = shadowmap_projection * vec4(position, 1.0);
+
+    if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
+        vec2 shadowmap_texcoord = ndc.xy * 0.5 + 0.5;
+        float shadowmap_depth = ndc.z * 0.5 + 0.5;
+
+        if (texture(shadowmap_texture, shadowmap_texcoord).r < shadowmap_depth) {
+            float ambient_light = 0.2;
+            vec3 color = albedo * ambient_light;
+            out_color = vec4(color, 1.0);
+        } else {
+            float ambient_light = 0.2;
+            vec3 color = albedo * ambient_light + sun_color * phong(sun_direction);
+            out_color = vec4(color, 1.0);
+        }
+    } else {
+        float ambient_light = 0.2;
+        vec3 color = albedo * ambient_light + sun_color * phong(sun_direction);
+        out_color = vec4(color, 1.0);
+    }
 }
 )";
 
@@ -247,6 +267,7 @@ try
     GLuint camera_position_location = glGetUniformLocation(program, "camera_position");
     GLuint albedo_location = glGetUniformLocation(program, "albedo");
     GLuint sun_direction_location = glGetUniformLocation(program, "sun_direction");
+    GLuint scene_shadowmap_projection_location = glGetUniformLocation(program, "shadowmap_projection");
     GLuint sun_color_location = glGetUniformLocation(program, "sun_color");
 
     // Init object
@@ -370,13 +391,13 @@ try
         float near = 0.1f;
         float far = 100.f;
 
+        glm::vec3 light_Z = glm::vec3(0, -1, 0);
+        glm::vec3 light_X = glm::vec3(1, 0, 0);
+        glm::vec3 light_Y = glm::cross(light_X, light_Z);
+        glm::mat4 shadowmap_projection = glm::mat4(glm::transpose(glm::mat3(light_X, light_Y, light_Z)));
+
         { // Draw shadowmap
             glm::mat4 model(1.f);
-
-            glm::vec3 light_Z = glm::vec3(0, -1, 0);
-            glm::vec3 light_X = glm::vec3(1, 0, 0);
-            glm::vec3 light_Y = glm::cross(light_X, light_Z);
-            glm::mat4 projection = glm::mat4(glm::transpose(glm::mat3(light_X, light_Y, light_Z)));
 
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
             glViewport(0, 0, shadowmap_size, shadowmap_size);
@@ -389,7 +410,7 @@ try
             glUseProgram(shadowmap_program);
 
             glUniformMatrix4fv(shadowmap_model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-            glUniformMatrix4fv(shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+            glUniformMatrix4fv(shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
 
             glBindVertexArray(scene_vao);
             glDrawElements(GL_TRIANGLES, scene.indices.size(), GL_UNSIGNED_INT, nullptr);
@@ -422,6 +443,9 @@ try
 
             glUseProgram(program);
 
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, textureID);
+
             glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
             glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
             glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
@@ -429,6 +453,7 @@ try
             glUniform3f(albedo_location, .8f, .7f, .6f);
             glUniform3f(sun_color_location, 1.f, 1.f, 1.f);
             glUniform3fv(sun_direction_location, 1, reinterpret_cast<float *>(&sun_direction));
+            glUniformMatrix4fv(scene_shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
 
             glBindVertexArray(scene_vao);
             glDrawElements(GL_TRIANGLES, scene.indices.size(), GL_UNSIGNED_INT, nullptr);
