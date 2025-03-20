@@ -89,10 +89,11 @@ void main()
     shadow_pos /= shadow_pos.w;
     shadow_pos = shadow_pos * 0.5 + vec4(0.5);
 
-    bool in_shadow_texture = (shadow_pos.x > 0.0) && (shadow_pos.x < 1.0) && (shadow_pos.y > 0.0) && (shadow_pos.y < 1.0) && (shadow_pos.z > 0.0) && (shadow_pos.z < 1.0);
-    float shadow_factor = 1.0;
-    if (in_shadow_texture)
-        shadow_factor = (texture(shadow_map, shadow_pos.xy).r + bias < shadow_pos.z) ? 0.0 : 1.0;
+    vec2 data = texture(shadow_map, shadow_pos.xy).rg;
+    float mu = data.r;
+    float sigma = data.g - mu * mu;
+    float z = shadow_pos.z;
+    float shadow_factor = (z < mu) ? 1.0 : sigma / (sigma + (z - mu) * (z - mu));
 
     vec3 albedo = vec3(1.0, 1.0, 1.0);
 
@@ -452,12 +453,12 @@ int main() try
                     float v_x = (i == 0 ? min_bouding_box_x : max_bouding_box_x);
                     float v_y = (j == 0 ? min_bouding_box_y : max_bouding_box_y);
                     float v_z = (k == 0 ? min_bouding_box_z : max_bouding_box_z);
-                    float value_x = (v_x - C_x) * light_x.x + (v_y - C_y) * light_x.y + (v_z - C_z) * light_x.z;
-                    max_value_x = std::max(max_value_x, value_x - 1);
-                    float value_y = (v_x - C_x) * light_y.x + (v_y - C_y) * light_y.y + (v_z - C_z) * light_y.z;
-                    max_value_y = std::max(max_value_y, value_y - 1);
-                    float value_z = (v_x - C_x) * light_z.x + (v_y - C_y) * light_z.y + (v_z - C_z) * light_z.z;
-                    max_value_z = std::max(max_value_z, value_z - 1);
+                    float value_x = std::abs((v_x - C_x) * light_x.x + (v_y - C_y) * light_x.y + (v_z - C_z) * light_x.z);
+                    max_value_x = std::max(max_value_x, value_x / 6);
+                    float value_y = std::abs((v_x - C_x) * light_y.x + (v_y - C_y) * light_y.y + (v_z - C_z) * light_y.z);
+                    max_value_y = std::max(max_value_y, value_y / 6);
+                    float value_z = std::abs((v_x - C_x) * light_z.x + (v_y - C_y) * light_z.y + (v_z - C_z) * light_z.z);
+                    max_value_z = std::max(max_value_z, value_z / 6);
                 }
             }
         }
