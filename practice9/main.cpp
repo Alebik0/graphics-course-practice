@@ -271,9 +271,39 @@ int main() try
     GLuint shadow_model_location = glGetUniformLocation(shadow_program, "model");
     GLuint shadow_transform_location = glGetUniformLocation(shadow_program, "transform");
 
+    // Read scene
     std::string project_root = PROJECT_ROOT;
     std::string scene_path = project_root + "/bunny.obj";
     obj_data scene = parse_obj(scene_path);
+
+    float min_bouding_box_x = 1e9;
+    float min_bouding_box_y = 1e9;
+    float min_bouding_box_z = 1e9;
+    float max_bouding_box_x = -1e9;
+    float max_bouding_box_y = -1e9;
+    float max_bouding_box_z = -1e9;
+    float C_x, C_y, C_z;
+
+    for (obj_data::vertex v : scene.vertices) {
+        min_bouding_box_x = std::min(min_bouding_box_x, v.position[0]);
+        min_bouding_box_y = std::min(min_bouding_box_y, v.position[1]);
+        min_bouding_box_z = std::min(min_bouding_box_z, v.position[2]);
+        max_bouding_box_x = std::max(max_bouding_box_x, v.position[0]);
+        max_bouding_box_y = std::max(max_bouding_box_y, v.position[1]);
+        max_bouding_box_z = std::max(max_bouding_box_z, v.position[2]);
+    }
+
+    C_x = (max_bouding_box_x + min_bouding_box_x) / 2;
+    C_y = (max_bouding_box_y + min_bouding_box_y) / 2;
+    C_z = (max_bouding_box_z + min_bouding_box_z) / 2;
+
+    std::cout << min_bouding_box_x << " " <<
+        min_bouding_box_y << " " <<
+        min_bouding_box_z << " " <<
+        max_bouding_box_x << " " <<
+        max_bouding_box_y << " " <<
+        max_bouding_box_z << " " << std::endl;
+    std::cout << C_x << ' ' << C_y << ' ' << C_z << std::endl;
 
     GLuint vao, vbo, ebo;
     glGenVertexArrays(1, &vao);
@@ -389,15 +419,49 @@ int main() try
         glm::vec3 light_z = -light_direction;
         glm::vec3 light_x = glm::normalize(glm::cross(light_z, {0.f, 1.f, 0.f}));
         glm::vec3 light_y = glm::cross(light_x, light_z);
-        float shadow_scale = 2.f;
 
-        glm::mat4 transform = glm::mat4(1.f);
-        for (size_t i = 0; i < 3; ++i)
-        {
-            transform[i][0] = shadow_scale * light_x[i];
-            transform[i][1] = shadow_scale * light_y[i];
-            transform[i][2] = shadow_scale * light_z[i];
+        // float shadow_scale = 2.f;
+        // glm::mat4 transform = glm::mat4(1.f);
+        // for (size_t i = 0; i < 3; ++i)
+        // {
+        //     transform[i][0] = shadow_scale * light_x[i];
+        //     transform[i][1] = shadow_scale * light_y[i];
+        //     transform[i][2] = shadow_scale * light_z[i];
+        // }
+
+        float max_value_x = 0;
+        float max_value_y = 0;
+        float max_value_z = 0;
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                for (int k = 0; k < 2; k++) {
+                    float v_x = (i == 0 ? min_bouding_box_x : max_bouding_box_x);
+                    float v_y = (j == 0 ? min_bouding_box_y : max_bouding_box_y);
+                    float v_z = (k == 0 ? min_bouding_box_z : max_bouding_box_z);
+                    float value_x = (v_x - C_x) * light_x.x + (v_y - C_y) * light_x.y + (v_z - C_z) * light_x.z;
+                    max_value_x = std::max(max_value_x, value_x - 1);
+                    float value_y = (v_x - C_x) * light_y.x + (v_y - C_y) * light_y.y + (v_z - C_z) * light_y.z;
+                    max_value_y = std::max(max_value_y, value_y - 1);
+                    float value_z = (v_x - C_x) * light_z.x + (v_y - C_y) * light_z.y + (v_z - C_z) * light_z.z;
+                    max_value_z = std::max(max_value_z, value_z - 1);
+                }
+            }
         }
+
+        glm::mat4 transform = glm::mat4(0.f);
+        transform[0][0] = light_x.x * max_value_x;
+        transform[1][0] = light_x.y * max_value_x;
+        transform[2][0] = light_x.z * max_value_x;
+        transform[0][1] = light_y.x * max_value_y;
+        transform[1][1] = light_y.y * max_value_y;
+        transform[2][1] = light_y.z * max_value_y;
+        transform[0][2] = light_z.x * max_value_z;
+        transform[1][2] = light_z.y * max_value_z;
+        transform[2][2] = light_z.z * max_value_z;
+        transform[0][3] = C_x;
+        transform[1][3] = C_y;
+        transform[2][3] = C_z;
+        transform[3][3] = 1.f;
 
         glUseProgram(shadow_program);
         glUniformMatrix4fv(shadow_model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
