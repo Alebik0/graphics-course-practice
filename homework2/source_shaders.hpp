@@ -17,11 +17,13 @@ uniform mat4 projection;
 layout (location = 0) in vec3 in_position;
 layout (location = 1) in vec3 in_normal;
 
+out vec3 position;
 out vec3 normal;
 
 void main()
 {
-    gl_Position = projection * view * model * vec4(in_position, 1.0);
+    position = (model * vec4(in_position, 1.0)).xyz;
+    gl_Position = projection * view * vec4(position, 1.0);
     normal = normalize(mat3(model) * in_normal);
 }
 )";
@@ -30,31 +32,29 @@ const char fragment_shader_source[] =
 R"(#version 330 core
 
 uniform vec3 camera_position;
+uniform vec3 albedo;
 
+uniform vec3 ambient_light;
+uniform vec3 sun_direction;
+uniform vec3 sun_color;
+
+in vec3 position;
 in vec3 normal;
 
 layout (location = 0) out vec4 out_color;
 
+vec3 diffuse(vec3 direction)
+{
+    return albedo * max(0.0, dot(normal, direction));
+}
+
 void main()
 {
-    vec3 ambient_dir = vec3(0.0, 1.0, 0.0);
-    vec3 ambient_color = vec3(0.2);
-
-    vec3 light1_dir = normalize(vec3( 3.0, 2.0,  1.0));
-    vec3 light2_dir = normalize(vec3(-3.0, 2.0, -1.0));
-
-    vec3 light1_color = vec3(1.0,  0.5, 0.25);
-    vec3 light2_color = vec3(0.25, 0.5, 1.0 );
-
-    vec3 n = normalize(normal);
-
-    vec3 color = (0.5 + 0.5 * dot(n, ambient_dir)) * ambient_color
-        + max(0.0, dot(n, light1_dir)) * light1_color
-        + max(0.0, dot(n, light2_dir)) * light2_color
-        ;
-
-    float gamma = 1.0 / 2.2;
-    out_color = vec4(pow(min(vec3(1.0), color), vec3(gamma)), 1.0);
+    vec3 ambient_color = albedo * ambient_light;
+    vec3 sun_color = diffuse(sun_direction) * sun_color;
+    vec3 color = ambient_color + sun_color;
+    
+    out_color = vec4(color, 1.0);
 }
 )";
 
@@ -69,6 +69,15 @@ struct source_shader_program
     GLuint projection_location;
 
     GLuint camera_position_location;
+    GLuint albedo_location;
+    GLuint ambient_light_location;
+    GLuint sun_direction_location;
+    GLuint sun_color_location;
+    GLuint point_light_position_location;
+    GLuint point_light_color_location;
+    GLuint point_light_attenuation_location;
+    GLuint glossiness_location;
+    GLuint roughness_location;
 
     source_shader_program(GLuint program, GLuint vertex_shader, GLuint fragment_shader) :
         program(program),
@@ -77,5 +86,9 @@ struct source_shader_program
         model_location(glGetUniformLocation(program, "model")),
         view_location(glGetUniformLocation(program, "view")),
         projection_location(glGetUniformLocation(program, "projection")),
-        camera_position_location(glGetUniformLocation(program, "camera_position")) {}
+        camera_position_location(glGetUniformLocation(program, "camera_position")),
+        albedo_location(glGetUniformLocation(program, "albedo")),
+        ambient_light_location(glGetUniformLocation(program, "ambient_light")),
+        sun_direction_location(glGetUniformLocation(program, "sun_direction")),
+        sun_color_location(glGetUniformLocation(program, "sun_color")) {}
 };
