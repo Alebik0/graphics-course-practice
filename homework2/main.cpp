@@ -163,59 +163,62 @@ int main() try
             exit(1);
         }
 
-        std::cout << "Loaded:\n"
-            << "- " << shapes.size() << " shapes\n"
-            << "- " << materials.size() << " materials\n";
         // Loop over shapes
         for (size_t s = 0; s < shapes.size(); s++) {
             // Loop over faces(polygon)
             size_t index_offset = 0;
             for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+                obj_data::face_data current_face_data;
+                current_face_data.firstVertex = scene.vertices.size();
+
                 size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
 
                 // Loop over vertices in the face.
                 for (size_t v = 0; v < fv; v++) {
                     obj_data::vertex current_v;
-
-                    // access to vertex
                     tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-
                     tinyobj::real_t vx = attrib.vertices[3*size_t(idx.vertex_index)+0];
                     tinyobj::real_t vy = attrib.vertices[3*size_t(idx.vertex_index)+1];
                     tinyobj::real_t vz = attrib.vertices[3*size_t(idx.vertex_index)+2];
                     current_v.position = { vx, vy, vz };                   
 
-                    // Check if `normal_index` is zero or positive. negative = no normal data
                     if (idx.normal_index >= 0) {
                         tinyobj::real_t nx = attrib.normals[3*size_t(idx.normal_index)+0];
                         tinyobj::real_t ny = attrib.normals[3*size_t(idx.normal_index)+1];
                         tinyobj::real_t nz = attrib.normals[3*size_t(idx.normal_index)+2];
                         current_v.normal = { nx, ny, nz };
-                    } else {
-                        current_v.normal = { 0.f, 0.f, 0.f };
                     }
 
-                    // Check if `texcoord_index` is zero or positive. negative = no texcoord data
                     if (idx.texcoord_index >= 0) {
                         tinyobj::real_t tx = attrib.texcoords[2*size_t(idx.texcoord_index)+0];
                         tinyobj::real_t ty = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
                         current_v.texcoord = { tx, };
-                    } {
-                        current_v.texcoord = { 0.f, 0.f };
                     }
-                    // Optional: vertex colors
-                    // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
-                    // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-                    // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
 
                     scene.vertices.push_back(current_v);
                 }
                 index_offset += fv;
 
+                current_face_data.countVertex = scene.vertices.size() - current_face_data.firstVertex;
+
                 // per-face material
-                shapes[s].mesh.material_ids[f];
+                int material_idx = shapes[s].mesh.material_ids[f];
+                tinyobj::material_t material = materials.at(material_idx);
+                current_face_data.material_name = material.name;
+                current_face_data.albedo_texname = material.ambient_texname;
+                current_face_data.alpha_texname = material.alpha_texname;
+                current_face_data.glossiness = { material.specular[0], material.specular[1], material.specular[2] };
+                current_face_data.power = material.shininess;
+
+                scene.faces.push_back(current_face_data);
             }
         }
+
+        std::cout << "Loaded:\n"
+            << "- " << shapes.size() << " shapes\n"
+            << "- " << materials.size() << " materials\n"
+            << "- " << scene.vertices.size() << " vertices\n"
+            << "- " << scene.faces.size() << " faces\n";
     }
 
     { // Log obj info
@@ -225,7 +228,7 @@ int main() try
         float maxx = -1e9;
         float maxy = -1e9;
         float maxz = -1e9;
-    
+        
         for (auto v: scene.vertices) {
             minx = std::min(minx, v.position[0]);
             miny = std::min(miny, v.position[1]);
@@ -238,11 +241,9 @@ int main() try
         glm::vec3 scene_bouding_box_min(minx, miny, minz);
         glm::vec3 scene_bouding_box_max(maxx, maxy, maxz);
     
-        std::cout << "Loaded scene" << "\n"
-            << "Vertexes: " << scene.vertices.size() << '\n'
-            << "Bouding box min: " << scene_bouding_box_min.x << ' ' << scene_bouding_box_min.y << ' ' << scene_bouding_box_min.z << '\n'
-            << "Bouding box max: " << scene_bouding_box_max.x << ' ' << scene_bouding_box_max.y << ' ' << scene_bouding_box_max.z << '\n'
-            << std::endl;
+        std::cout << "Bouding box min: " << scene_bouding_box_min.x << ' ' << scene_bouding_box_min.y << ' ' << scene_bouding_box_min.z << '\n'
+                  << "Bouding box max: " << scene_bouding_box_max.x << ' ' << scene_bouding_box_max.y << ' ' << scene_bouding_box_max.z << '\n'
+                  << std::endl;
     }
 
     GLuint vao, vbo, debug_vao;
@@ -369,7 +370,9 @@ int main() try
             glUniform3f(source_program.sun_color_location, 1.0f, 0.9f, 0.8f);
     
             glBindVertexArray(vao);
-            glDrawArrays(GL_TRIANGLES, 0, scene.vertices.size());
+
+            for (obj_data::face_data face : scene.faces)
+                glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
         }
 
         { // Draw debug
