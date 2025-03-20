@@ -34,6 +34,12 @@
 #include "source_shaders.hpp"
 #include "debug_shaders.hpp"
 
+const float CAMERA_SPEED = 500.f;
+const float CAMERA_ROTATION_SPEED = glm::pi<float>() / 2;
+const glm::vec3 UP(0.f, -1.f, 0.f);
+const glm::vec3 RGH(1.f, 0.f, 0.f);
+const glm::vec3 FWD(0.f, 0.f, 1.f);
+
 std::string to_string(std::string_view str)
 {
     return std::string(str.begin(), str.end());
@@ -135,11 +141,12 @@ int main() try
     std::string project_root = PROJECT_ROOT;
     std::string scene_path = project_root + "/data/sponza/sponza.obj";
     std::string scene_dir = project_root + "/data/sponza/";
-    // std::string scene_path = project_root + "/suzanne.obj";
-    // std::string scene_dir = project_root;
-    obj_data scene = parse_obj(scene_path);
+    obj_data scene;
     
-    /*{ // Load scene
+    { // Load scene
+        scene = parse_obj(scene_path);
+
+        /*
         std::string inputfile = scene_path;
         std::string mtl_basedir = scene_dir;
         bool triangulate = true;
@@ -214,7 +221,8 @@ int main() try
         for (int i = 0; i < scene.vertices.size(); i++) {
             scene.indices.push_back(i);
         }
-    } */
+        */
+    }
 
     { // Log obj info
         float minx = 1e9;
@@ -244,41 +252,36 @@ int main() try
             << std::endl;
     }
 
-    GLuint vao, vbo, ebo;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
+    GLuint vao, vbo, ebo, debug_vao;
+    { // Init gl scene
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
 
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, scene.vertices.size() * sizeof(scene.vertices[0]), scene.vertices.data(), GL_STATIC_DRAW);
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, scene.vertices.size() * sizeof(scene.vertices[0]), scene.vertices.data(), GL_STATIC_DRAW);
 
-    glGenBuffers(1, &ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, scene.indices.size() * sizeof(scene.indices[0]), scene.indices.data(), GL_STATIC_DRAW);
+        glGenBuffers(1, &ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, scene.indices.size() * sizeof(scene.indices[0]), scene.indices.data(), GL_STATIC_DRAW);
 
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(0));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(12));
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(0));
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(12));
 
-    GLuint debug_vao;
-    glGenVertexArrays(1, &debug_vao);
+        glGenVertexArrays(1, &debug_vao);
+    }
 
-    auto last_frame_start = std::chrono::high_resolution_clock::now();
 
     float time = 0.f;
     bool paused = false;
-
+    auto last_frame_start = std::chrono::high_resolution_clock::now();
+    
     std::map<SDL_Keycode, bool> button_down;
 
-    float camera_speed = 500.f;
-    float camera_rotation_speed = glm::pi<float>() / 2;
-    glm::vec3 UP(0.f, -1.f, 0.f);
-    glm::vec3 RGH(1.f, 0.f, 0.f);
-    glm::vec3 FWD(0.f, 0.f, 1.f);
     glm::vec3 camera_position(1000.f, -125.f, 30.f);
     float camera_angle = 3 * glm::pi<float>() / 2;
-
     float near = 0.1f;
     float far = 10000.f;
 
@@ -319,26 +322,26 @@ int main() try
             bool position_changed = false;
 
             if (button_down[SDLK_w]) {
-                camera_position += UP * dt * camera_speed;
+                camera_position += UP * dt * CAMERA_SPEED;
                 position_changed = true;
             }
             if (button_down[SDLK_s]) {
-                camera_position -= UP * dt * camera_speed;
+                camera_position -= UP * dt * CAMERA_SPEED;
                 position_changed;
             }
             if (button_down[SDLK_UP]) {
-                camera_position += (FWD * std::cos(camera_angle) + RGH * std::sin(camera_angle)) * camera_speed * dt;
+                camera_position += (FWD * std::cos(camera_angle) + RGH * std::sin(camera_angle)) * CAMERA_SPEED * dt;
                 position_changed = true;
             }
             if (button_down[SDLK_DOWN]) {
-                camera_position -= (FWD * std::cos(camera_angle) + RGH * std::sin(camera_angle)) * camera_speed * dt;
+                camera_position -= (FWD * std::cos(camera_angle) + RGH * std::sin(camera_angle)) * CAMERA_SPEED * dt;
                 position_changed = true;
             }
             
             if (button_down[SDLK_d])
-                camera_angle -= camera_rotation_speed * dt;
+                camera_angle -= CAMERA_ROTATION_SPEED * dt;
             if (button_down[SDLK_a])
-                camera_angle += camera_rotation_speed * dt;
+                camera_angle += CAMERA_ROTATION_SPEED * dt;
 
             if (position_changed) {
                 std::cout << "Position changed: " 
