@@ -38,15 +38,19 @@
 #include "source_shaders.hpp"
 #include "debug_shaders.hpp"
 
-const float CAMERA_SPEED = 500.f;
+const float CAMERA_SPEED = 250.f;
 const float CAMERA_ROTATION_SPEED = glm::pi<float>() / 2;
-const glm::vec3 UP(0.f, -1.f, 0.f);
+const glm::vec3 UP(0.f, 1.f, 0.f);
 const glm::vec3 RGH(1.f, 0.f, 0.f);
 const glm::vec3 FWD(0.f, 0.f, 1.f);
 const glm::vec3 CLEAR_COLOR(0.8f, 0.8f, 1.0f);
 const glm::vec3 AMBIENT_COLOR(0.1f, 0.1f, 0.1f);
 const glm::vec3 SUN_COLOR(1.0f, 0.95f, 0.9f);
-const glm::vec3 SUN_DIRECTION = -UP - RGH;
+const glm::vec3 SUN_DIRECTION = UP + RGH;
+const glm::vec3 LIGHT_COLOR(1.f, 0.0f, 1.f);
+const glm::vec3 LIGHT_ATTENUATION(0.4f, 0.f, 0.00002f);
+const glm::vec3 INITIAL_CAMERA_POSITION(1000.f, 125.f, 0.f);
+const glm::vec3 LIGHT_POSITION(1200.f, 125.f, 0.f);
 
 std::string to_string(std::string_view str)
 {
@@ -356,8 +360,8 @@ int main() try
     
     std::map<SDL_Keycode, bool> button_down;
 
-    glm::vec3 camera_position(1000.f, -125.f, 30.f);
-    float camera_angle = 3 * glm::pi<float>() / 2;
+    glm::vec3 camera_position = INITIAL_CAMERA_POSITION;
+    float camera_angle = glm::pi<float>() / 2;
     float near = 0.1f;
     float far = 10000.f;
 
@@ -406,18 +410,18 @@ int main() try
                 position_changed;
             }
             if (button_down[SDLK_UP]) {
-                camera_position += (FWD * std::cos(camera_angle) + RGH * std::sin(camera_angle)) * CAMERA_SPEED * dt;
+                camera_position += (- FWD * std::cos(camera_angle) + RGH * std::sin(camera_angle)) * CAMERA_SPEED * dt;
                 position_changed = true;
             }
             if (button_down[SDLK_DOWN]) {
-                camera_position -= (FWD * std::cos(camera_angle) + RGH * std::sin(camera_angle)) * CAMERA_SPEED * dt;
+                camera_position -= (- FWD * std::cos(camera_angle) + RGH * std::sin(camera_angle)) * CAMERA_SPEED * dt;
                 position_changed = true;
             }
             
             if (button_down[SDLK_d])
-                camera_angle -= CAMERA_ROTATION_SPEED * dt;
-            if (button_down[SDLK_a])
                 camera_angle += CAMERA_ROTATION_SPEED * dt;
+            if (button_down[SDLK_a])
+                camera_angle -= CAMERA_ROTATION_SPEED * dt;
 
             if (position_changed) {
                 std::cout << "Position changed: " 
@@ -434,7 +438,7 @@ int main() try
     
             glm::mat4 view(1.f);
             view = glm::rotate(view, camera_angle, UP);
-            view = glm::translate(view, camera_position);
+            view = glm::translate(view, -camera_position);
     
             glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, (1.f * width) / height, near, far);
     
@@ -446,30 +450,37 @@ int main() try
             glEnable(GL_CULL_FACE);
 
             glUseProgram(source_program.program);
-            glUniformMatrix4fv(source_program.model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-            glUniformMatrix4fv(source_program.view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
-            glUniformMatrix4fv(source_program.projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
-            glUniform3fv(source_program.camera_position_location, 1, (float *) (&camera_position));
-            glUniform3f(source_program.ambient_light_location, AMBIENT_COLOR.r, AMBIENT_COLOR.g, AMBIENT_COLOR.b);
-            glUniform3f(source_program.sun_direction_location, SUN_DIRECTION.x, SUN_DIRECTION.y, SUN_DIRECTION.z);
-            glUniform3f(source_program.sun_color_location, SUN_COLOR.r, SUN_COLOR.g, SUN_COLOR.b);
+            glUniformMatrix4fv(source_program.model, 1, GL_FALSE, reinterpret_cast<float *>(&model));
+            glUniformMatrix4fv(source_program.view, 1, GL_FALSE, reinterpret_cast<float *>(&view));
+            glUniformMatrix4fv(source_program.projection, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+
+            glUniform3f(source_program.ambient_light, AMBIENT_COLOR.r, AMBIENT_COLOR.g, AMBIENT_COLOR.b);
+            
+            glUniform3f(source_program.sun_direction, SUN_DIRECTION.x, SUN_DIRECTION.y, SUN_DIRECTION.z);
+            glUniform3f(source_program.sun_color, SUN_COLOR.r, SUN_COLOR.g, SUN_COLOR.b);
+
+            glUniform3f(source_program.point_light_position, LIGHT_POSITION.x, LIGHT_POSITION.y, LIGHT_POSITION.z);
+            glUniform3f(source_program.point_light_color, LIGHT_COLOR.r, LIGHT_COLOR.g, LIGHT_COLOR.b);
+            glUniform3f(source_program.point_light_attenuation, LIGHT_ATTENUATION.x, LIGHT_ATTENUATION.y, LIGHT_ATTENUATION.z);
     
             glBindVertexArray(vao);
 
             for (obj_data::face_data face : scene.faces) {
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, face.albedo_texture);
-                glUniform1i(source_program.albedo_texture_location, 0);
+                glUniform1i(source_program.albedo_texture, 0);
 
                 if (face.alpha_texture != 0) {
                     glActiveTexture(GL_TEXTURE1);
                     glBindTexture(GL_TEXTURE_2D, face.alpha_texture);
-                    glUniform1i(source_program.alpha_texture_location, 1);
-                    glUniform1f(source_program.has_alpha_texture_location, 1.0f);
+                    glUniform1i(source_program.alpha_texture, 1);
+                    glUniform1f(source_program.has_alpha_texture, 1.0f);
                 } else {
-                    glUniform1f(source_program.has_alpha_texture_location, 0.0f);
+                    glUniform1f(source_program.has_alpha_texture, 0.0f);
                 }
 
+                glUniform3f(source_program.glossiness, face.glossiness[0], face.glossiness[1], face.glossiness[2]);
+                glUniform1f(source_program.roughness, face.power);
 
                 glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
             }
