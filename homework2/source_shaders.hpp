@@ -95,10 +95,22 @@ void main()
 
     if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
         vec3 shadowmap_texcoord = ndc.xyz * 0.5 + 0.5;
-        float shadow_depth = ndc.z * 0.5 + 0.5;
 
-        if (texture(shadowmapTexture, shadowmap_texcoord) < 0.5) {
-        } else {
+        float sum = 0.0;
+        float sum_w = 0.0;
+        const int N = 8;
+        float radius = 50.0;
+        for (int x = -N; x <= N; ++x) {
+            for (int y = -N; y <= N; ++y) {
+                float c = exp(-float(x * x + y * y) / (radius * radius));
+                vec3 delta = vec3(x, y, 0.0) / vec3(textureSize(shadowmapTexture, 0), 1.0);
+                vec3 curr_texcoord = shadowmap_texcoord + delta;
+                sum += c * texture(shadowmapTexture, curr_texcoord);
+                sum_w += c;
+            }
+        }
+
+        if (sum / sum_w > 0.5) {
             color += sun_color;
         }
     } else {

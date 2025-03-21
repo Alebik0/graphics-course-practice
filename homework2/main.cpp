@@ -169,7 +169,7 @@ int main() try
             }
         }
 
-        glm::vec3 sun_direction = UP + RGH * std::sin(time * 0.3f) + FWD * std::cos(time * 0.3f);
+        glm::vec3 sun_direction = UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f);
         glm::mat4 shadowmap_projection(1.f);
 
         { // Draw shadowmap
