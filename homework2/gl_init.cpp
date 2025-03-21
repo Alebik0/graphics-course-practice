@@ -86,6 +86,8 @@ gl_data init_gl(const obj_data & scene) {
     result.source__albedo_texture = glGetUniformLocation(result.source_program, "albedoTexture");
     result.source__alpha_texture = glGetUniformLocation(result.source_program, "alphaTexture");
     result.source__has_alpha_texture = glGetUniformLocation(result.source_program, "hasAlphaTexture");
+    result.source__shadowmap_texture = glGetUniformLocation(result.source_program, "shadowmapTexture");
+    result.source__shadowmap_projection = glGetUniformLocation(result.source_program, "shadowmap_projection");
 
     result.debug__shadowmap_texture = glGetUniformLocation(result.debug_program, "shadowmapTexture");
 

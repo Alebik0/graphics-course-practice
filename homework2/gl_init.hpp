@@ -32,6 +32,8 @@ struct gl_data {
     GLuint source__albedo_texture;
     GLuint source__alpha_texture;
     GLuint source__has_alpha_texture;
+    GLuint source__shadowmap_texture;
+    GLuint source__shadowmap_projection;
 
     GLuint debug_program;
     GLuint debug_vertex_shader;

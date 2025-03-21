@@ -169,13 +169,15 @@ int main() try
             }
         }
 
+        glm::vec3 sun_direction = UP + RGH * std::sin(time * 0.3f) + FWD * std::cos(time * 0.3f);
+        glm::mat4 shadowmap_projection(1.f);
+
         { // Draw shadowmap
             glm::mat4 model(1.f);
-            glm::mat4 projection(1.f);
 
-            { // Init shadowmap projection
+            { // Init shadowmap shadowmap_projection
                 glm::vec3 C(0.f);
-                glm::vec3 light_z = -SUN_DIRECTION;
+                glm::vec3 light_z = -glm::normalize(sun_direction);
                 glm::vec3 light_x = glm::normalize(glm::cross(light_z, {0.f, 1.f, 0.f}));
                 glm::vec3 light_y = glm::cross(light_x, light_z);
     
@@ -193,12 +195,12 @@ int main() try
                     }
                 }
     
-                projection[0] = {max_value_x * light_x, 0};
-                projection[1] = {max_value_y * light_y, 0};
-                projection[2] = {max_value_z * light_z, 0};
-                projection[3] = {C, 1};
+                shadowmap_projection[0] = {max_value_x * light_x, 0};
+                shadowmap_projection[1] = {max_value_y * light_y, 0};
+                shadowmap_projection[2] = {max_value_z * light_z, 0};
+                shadowmap_projection[3] = {C, 1};
     
-                projection = glm::inverse(projection);
+                shadowmap_projection = glm::inverse(shadowmap_projection);
             }
 
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, scene_gl_data.shadow_fbo);
@@ -212,7 +214,7 @@ int main() try
             glUseProgram(scene_gl_data.shadowmap_program);
 
             glUniformMatrix4fv(scene_gl_data.shadowmap__model, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-            glUniformMatrix4fv(scene_gl_data.shadowmap__projection, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+            glUniformMatrix4fv(scene_gl_data.shadowmap__projection, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
 
             { // Draw full scene
                 glBindVertexArray(scene_gl_data.vao);
@@ -254,6 +256,11 @@ int main() try
             glUniform3f(scene_gl_data.source__point_light_position, current_light_position.x, current_light_position.y, current_light_position.z);
             glUniform3f(scene_gl_data.source__point_light_color, LIGHT_COLOR.r, LIGHT_COLOR.g, LIGHT_COLOR.b);
             glUniform3f(scene_gl_data.source__point_light_attenuation, LIGHT_ATTENUATION.x, LIGHT_ATTENUATION.y, LIGHT_ATTENUATION.z);
+            
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, scene_gl_data.shadow_map);
+            glUniform1i(scene_gl_data.source__shadowmap_texture, 2);
+            glUniformMatrix4fv(scene_gl_data.source__shadowmap_projection, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
             
             { // Draw full scene
                 glBindVertexArray(scene_gl_data.vao);

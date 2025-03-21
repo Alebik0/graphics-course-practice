@@ -54,6 +54,9 @@ uniform sampler2D albedoTexture;
 uniform sampler2D alphaTexture;
 uniform float hasAlphaTexture;
 
+uniform sampler2D shadowmapTexture;
+uniform mat4 shadowmap_projection;
+
 in vec3 position;
 in vec3 normal;
 in vec2 texcoord;
@@ -73,22 +76,37 @@ vec3 diffuse(vec3 direction)
 
 void main()
 {
-    if (hasAlphaTexture > 0.5 && texture(alphaTexture, texcoord).r < 0.5) {
+    if (hasAlphaTexture > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
         discard;
-    } else {
-        albedo = texture(albedoTexture, texcoord).rgb;
-        vec3 ambient_color = albedo * ambient_light;
-        vec3 sun_color = diffuse(sun_direction) * sun_color;
-    
-        float distance = length(point_light_position - position);
-        float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
-        float light_attenuation = 1.0 / divider;
-        vec3 light_vector = normalize(position - point_light_position);
-        vec3 light_color = (diffuse(-light_vector) + specular(-light_vector)) * light_attenuation * point_light_color;
 
-        vec3 color = ambient_color + sun_color + light_color;
-        
-        out_color = vec4(color, 1.0);
-    }
+    albedo = texture(albedoTexture, texcoord).rgb;
+    vec3 ambient_color = albedo * ambient_light;
+    vec3 sun_color = diffuse(sun_direction) * sun_color;
+
+    float distance = length(point_light_position - position);
+    float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
+    float light_attenuation = 1.0 / divider;
+    vec3 light_vector = normalize(position - point_light_position);
+    vec3 light_color = (diffuse(-light_vector) + specular(-light_vector)) * light_attenuation * point_light_color;
+
+    vec3 color = ambient_color;
+
+    vec4 ndc = shadowmap_projection * vec4(position, 1.0);
+
+    if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
+        vec2 shadowmap_texcoord = ndc.xy * 0.5 + 0.5;
+        float shadow_depth = ndc.z * 0.5 + 0.5;
+
+        if (texture(shadowmapTexture, shadowmap_texcoord).r < shadow_depth) {
+        } else {
+            color += sun_color;
+        }
+    } else {
+        color += sun_color;
+    }    
+
+    color += light_color;
+
+    out_color = vec4(color, 1.0);
 }
 )";
