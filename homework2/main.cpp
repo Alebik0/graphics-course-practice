@@ -51,6 +51,7 @@ const glm::vec3 LIGHT_COLOR(1.f, 0.0f, 1.f);
 const glm::vec3 LIGHT_ATTENUATION(0.4f, 0.f, 0.00002f);
 const glm::vec3 INITIAL_CAMERA_POSITION(1000.f, 125.f, 0.f);
 const glm::vec3 LIGHT_POSITION(1200.f, 125.f, 0.f);
+const glm::vec3 LIGHT_DELTA(0.f, 0.f, 500.f);
 
 std::string to_string(std::string_view str)
 {
@@ -459,7 +460,8 @@ int main() try
             glUniform3f(source_program.sun_direction, SUN_DIRECTION.x, SUN_DIRECTION.y, SUN_DIRECTION.z);
             glUniform3f(source_program.sun_color, SUN_COLOR.r, SUN_COLOR.g, SUN_COLOR.b);
 
-            glUniform3f(source_program.point_light_position, LIGHT_POSITION.x, LIGHT_POSITION.y, LIGHT_POSITION.z);
+            glm::vec3 current_light_position = LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.3f);
+            glUniform3f(source_program.point_light_position, current_light_position.x, current_light_position.y, current_light_position.z);
             glUniform3f(source_program.point_light_color, LIGHT_COLOR.r, LIGHT_COLOR.g, LIGHT_COLOR.b);
             glUniform3f(source_program.point_light_attenuation, LIGHT_ATTENUATION.x, LIGHT_ATTENUATION.y, LIGHT_ATTENUATION.z);
     
