@@ -1,3 +1,5 @@
+#pragma once
+
 const char * debug_vertex_shader = R"(#version 330 core
 
 vec2 vertices[6] = vec2[6](

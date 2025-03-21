@@ -1,3 +1,5 @@
+#pragma once
+
 #ifdef WIN32
 #include <SDL.h>
 #undef main
@@ -131,4 +133,6 @@ struct source_shader_program
         albedo_texture(glGetUniformLocation(program, "albedoTexture")),
         alpha_texture(glGetUniformLocation(program, "alphaTexture")),
         has_alpha_texture(glGetUniformLocation(program, "hasAlphaTexture")) {}
+
+    source_shader_program() {}
 };

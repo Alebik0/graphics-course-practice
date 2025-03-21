@@ -28,8 +28,6 @@
 #include <glm/gtx/string_cast.hpp>
 
 #include "obj_parser.hpp"
-#include "source_shaders.hpp"
-#include "debug_shaders.hpp"
 #include "globals.hpp"
 #include "gl_init.hpp"
 #include "scene_init.hpp"
@@ -48,45 +46,6 @@ void sdl2_fail(std::string_view message)
 void glew_fail(std::string_view message, GLenum error)
 {
     throw std::runtime_error(to_string(message) + reinterpret_cast<const char *>(glewGetErrorString(error)));
-}
-
-GLuint create_shader(GLenum type, const char * source)
-{
-    GLuint result = glCreateShader(type);
-    glShaderSource(result, 1, &source, nullptr);
-    glCompileShader(result);
-    GLint status;
-    glGetShaderiv(result, GL_COMPILE_STATUS, &status);
-    if (status != GL_TRUE)
-    {
-        GLint info_log_length;
-        glGetShaderiv(result, GL_INFO_LOG_LENGTH, &info_log_length);
-        std::string info_log(info_log_length, '\0');
-        glGetShaderInfoLog(result, info_log.size(), nullptr, info_log.data());
-        throw std::runtime_error("Shader compilation failed: " + info_log);
-    }
-    return result;
-}
-
-GLuint create_program(GLuint vertex_shader, GLuint fragment_shader)
-{
-    GLuint result = glCreateProgram();
-    glAttachShader(result, vertex_shader);
-    glAttachShader(result, fragment_shader);
-    glLinkProgram(result);
-
-    GLint status;
-    glGetProgramiv(result, GL_LINK_STATUS, &status);
-    if (status != GL_TRUE)
-    {
-        GLint info_log_length;
-        glGetProgramiv(result, GL_INFO_LOG_LENGTH, &info_log_length);
-        std::string info_log(info_log_length, '\0');
-        glGetProgramInfoLog(result, info_log.size(), nullptr, info_log.data());
-        throw std::runtime_error("Program linkage failed: " + info_log);
-    }
-
-    return result;
 }
 
 int main() try
@@ -124,14 +83,6 @@ int main() try
 
     if (!GLEW_VERSION_3_3)
         throw std::runtime_error("OpenGL 3.3 is not supported");
-
-    auto vertex_shader = create_shader(GL_VERTEX_SHADER, vertex_shader_source);
-    auto fragment_shader = create_shader(GL_FRAGMENT_SHADER, fragment_shader_source);
-    auto source_program = source_shader_program(create_program(vertex_shader, fragment_shader), vertex_shader, fragment_shader);
-
-    auto debug_vs = create_shader(GL_VERTEX_SHADER, debug_vertex_shader);
-    auto debug_fs = create_shader(GL_FRAGMENT_SHADER, debug_fragment_shader);
-    auto debug_program = create_program(debug_vs, debug_fs);
 
     std::string project_root = PROJECT_ROOT;
     std::string scene_path = project_root + "/data/sponza/sponza.obj";
@@ -235,46 +186,46 @@ int main() try
             glEnable(GL_DEPTH_TEST);
             glEnable(GL_CULL_FACE);
 
-            glUseProgram(source_program.program);
-            glUniformMatrix4fv(source_program.model, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-            glUniformMatrix4fv(source_program.view, 1, GL_FALSE, reinterpret_cast<float *>(&view));
-            glUniformMatrix4fv(source_program.projection, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+            glUseProgram(scene_gl_data.source_program.program);
+            glUniformMatrix4fv(scene_gl_data.source_program.model, 1, GL_FALSE, reinterpret_cast<float *>(&model));
+            glUniformMatrix4fv(scene_gl_data.source_program.view, 1, GL_FALSE, reinterpret_cast<float *>(&view));
+            glUniformMatrix4fv(scene_gl_data.source_program.projection, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
 
-            glUniform3f(source_program.ambient_light, AMBIENT_COLOR.r, AMBIENT_COLOR.g, AMBIENT_COLOR.b);
+            glUniform3f(scene_gl_data.source_program.ambient_light, AMBIENT_COLOR.r, AMBIENT_COLOR.g, AMBIENT_COLOR.b);
             
-            glUniform3f(source_program.sun_direction, SUN_DIRECTION.x, SUN_DIRECTION.y, SUN_DIRECTION.z);
-            glUniform3f(source_program.sun_color, SUN_COLOR.r, SUN_COLOR.g, SUN_COLOR.b);
+            glUniform3f(scene_gl_data.source_program.sun_direction, SUN_DIRECTION.x, SUN_DIRECTION.y, SUN_DIRECTION.z);
+            glUniform3f(scene_gl_data.source_program.sun_color, SUN_COLOR.r, SUN_COLOR.g, SUN_COLOR.b);
 
             glm::vec3 current_light_position = LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.3f);
-            glUniform3f(source_program.point_light_position, current_light_position.x, current_light_position.y, current_light_position.z);
-            glUniform3f(source_program.point_light_color, LIGHT_COLOR.r, LIGHT_COLOR.g, LIGHT_COLOR.b);
-            glUniform3f(source_program.point_light_attenuation, LIGHT_ATTENUATION.x, LIGHT_ATTENUATION.y, LIGHT_ATTENUATION.z);
+            glUniform3f(scene_gl_data.source_program.point_light_position, current_light_position.x, current_light_position.y, current_light_position.z);
+            glUniform3f(scene_gl_data.source_program.point_light_color, LIGHT_COLOR.r, LIGHT_COLOR.g, LIGHT_COLOR.b);
+            glUniform3f(scene_gl_data.source_program.point_light_attenuation, LIGHT_ATTENUATION.x, LIGHT_ATTENUATION.y, LIGHT_ATTENUATION.z);
     
             glBindVertexArray(scene_gl_data.vao);
 
             for (obj_data::face_data face : scene.faces) {
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, face.albedo_texture);
-                glUniform1i(source_program.albedo_texture, 0);
+                glUniform1i(scene_gl_data.source_program.albedo_texture, 0);
 
                 if (face.alpha_texture != 0) {
                     glActiveTexture(GL_TEXTURE1);
                     glBindTexture(GL_TEXTURE_2D, face.alpha_texture);
-                    glUniform1i(source_program.alpha_texture, 1);
-                    glUniform1f(source_program.has_alpha_texture, 1.0f);
+                    glUniform1i(scene_gl_data.source_program.alpha_texture, 1);
+                    glUniform1f(scene_gl_data.source_program.has_alpha_texture, 1.0f);
                 } else {
-                    glUniform1f(source_program.has_alpha_texture, 0.0f);
+                    glUniform1f(scene_gl_data.source_program.has_alpha_texture, 0.0f);
                 }
 
-                glUniform3f(source_program.glossiness, face.glossiness[0], face.glossiness[1], face.glossiness[2]);
-                glUniform1f(source_program.roughness, face.power);
+                glUniform3f(scene_gl_data.source_program.glossiness, face.glossiness[0], face.glossiness[1], face.glossiness[2]);
+                glUniform1f(scene_gl_data.source_program.roughness, face.power);
 
                 glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
             }
         }
 
         { // Draw debug
-            glUseProgram(debug_program);
+            glUseProgram(scene_gl_data.debug_program);
             glBindVertexArray(scene_gl_data.debug_vao);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
