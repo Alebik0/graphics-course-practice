@@ -1,5 +1,14 @@
 #pragma once
 
+#ifdef WIN32
+#include <SDL.h>
+#undef main
+#else
+#include <SDL2/SDL.h>
+#endif
+
+#include <GL/glew.h>
+
 #include <array>
 #include <vector>
 #include <string>
@@ -22,6 +31,8 @@ struct obj_data
         std::string alpha_texname;              // TinyObj -> alpha_texname
         std::array<float, 3> glossiness;        // TinyObj -> specular
         float power;                            // TinyObj -> shininess
+        GLuint albedo_texture;
+        GLuint alpha_texture;
     };
 
     std::vector<vertex> vertices;

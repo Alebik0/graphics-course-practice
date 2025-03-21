@@ -16,15 +16,18 @@ uniform mat4 projection;
 
 layout (location = 0) in vec3 in_position;
 layout (location = 1) in vec3 in_normal;
+layout (location = 2) in vec2 in_texcoord;
 
 out vec3 position;
 out vec3 normal;
+out vec2 texcoord;
 
 void main()
 {
     position = (model * vec4(in_position, 1.0)).xyz;
     gl_Position = projection * view * vec4(position, 1.0);
     normal = normalize(mat3(model) * in_normal);
+    texcoord = in_texcoord;
 }
 )";
 
@@ -40,18 +43,17 @@ uniform vec3 sun_color;
 
 in vec3 position;
 in vec3 normal;
+in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
-vec3 diffuse(vec3 direction)
-{
-    return albedo * max(0.0, dot(normal, direction));
-}
+uniform sampler2D textureSample;
 
 void main()
 {
-    vec3 ambient_color = albedo * ambient_light;
-    vec3 sun_color = diffuse(sun_direction) * sun_color;
+    vec3 alb = texture(textureSample, texcoord).rgb;
+    vec3 ambient_color = alb * ambient_light;
+    vec3 sun_color = alb * max(0.0, dot(normal, sun_direction)) * sun_color;
     vec3 color = ambient_color + sun_color;
     
     out_color = vec4(color, 1.0);
@@ -73,11 +75,7 @@ struct source_shader_program
     GLuint ambient_light_location;
     GLuint sun_direction_location;
     GLuint sun_color_location;
-    GLuint point_light_position_location;
-    GLuint point_light_color_location;
-    GLuint point_light_attenuation_location;
-    GLuint glossiness_location;
-    GLuint roughness_location;
+    GLuint texture_location;
 
     source_shader_program(GLuint program, GLuint vertex_shader, GLuint fragment_shader) :
         program(program),
@@ -90,5 +88,6 @@ struct source_shader_program
         albedo_location(glGetUniformLocation(program, "albedo")),
         ambient_light_location(glGetUniformLocation(program, "ambient_light")),
         sun_direction_location(glGetUniformLocation(program, "sun_direction")),
-        sun_color_location(glGetUniformLocation(program, "sun_color")) {}
+        sun_color_location(glGetUniformLocation(program, "sun_color")),
+        texture_location(glGetUniformLocation(program, "textureSample")) {}
 };

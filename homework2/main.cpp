@@ -16,6 +16,7 @@
 #include <cmath>
 #include <fstream>
 #include <sstream>
+#include <string>
 
 #define GLM_FORCE_SWIZZLE
 #define GLM_ENABLE_EXPERIMENTAL
@@ -29,6 +30,9 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #define TINYOBJLOADER_USE_MAPBOX_EARCUT // Optional. define TINYOBJLOADER_USE_MAPBOX_EARCUT gives robust triangulation. Requires C++11
 #include "tiny_obj_loader.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #include "obj_parser.hpp"
 #include "source_shaders.hpp"
@@ -192,7 +196,7 @@ int main() try
                     if (idx.texcoord_index >= 0) {
                         tinyobj::real_t tx = attrib.texcoords[2*size_t(idx.texcoord_index)+0];
                         tinyobj::real_t ty = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
-                        current_v.texcoord = { tx, };
+                        current_v.texcoord = { tx, ty };
                     }
 
                     vertices_grouped_by_material[material_idx].push_back(current_v);
@@ -204,7 +208,7 @@ int main() try
         for (size_t material_idx = 0; material_idx < materials.size(); material_idx++) {
             obj_data::face_data current_face_data;
             current_face_data.firstVertex = scene.vertices.size();
-            
+
             for (obj_data::vertex v : vertices_grouped_by_material[material_idx]) {
                 scene.vertices.push_back(v);
             }
@@ -216,6 +220,64 @@ int main() try
             current_face_data.alpha_texname = material.alpha_texname;
             current_face_data.glossiness = { material.specular[0], material.specular[1], material.specular[2] };
             current_face_data.power = material.shininess;
+
+            if (current_face_data.albedo_texname != "") {
+                std::string texture_path = current_face_data.albedo_texname;
+                texture_path = texture_path.replace(texture_path.find("\\", 0), 1, "/");
+                texture_path = scene_dir + texture_path;
+
+                int texture_width, texture_height, texture_cpx;
+                unsigned char * texture_pixels = stbi_load(
+                    texture_path.c_str(),
+                    &texture_width,
+                    &texture_height,
+                    &texture_cpx,
+                    4);
+
+                GLuint textureID;
+                glGenTextures(1, &textureID);
+                glActiveTexture(GL_TEXTURE0 + textureID - 1);
+                glBindTexture(GL_TEXTURE_2D, textureID);
+
+
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+            
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_pixels);
+                glGenerateMipmap(GL_TEXTURE_2D);
+                stbi_image_free(texture_pixels);
+
+                current_face_data.albedo_texture = textureID;
+            }
+
+            if (current_face_data.alpha_texname != "") {
+                std::string texture_path = current_face_data.alpha_texname;
+                texture_path = texture_path.replace(texture_path.find("\\", 0), 1, "/");
+                texture_path = scene_dir + texture_path;
+
+                int texture_width, texture_height, texture_cpx;
+                unsigned char * texture_pixels = stbi_load(
+                    texture_path.c_str(),
+                    &texture_width,
+                    &texture_height,
+                    &texture_cpx,
+                    4);
+
+                GLuint textureID;
+                glGenTextures(1, &textureID);
+                glActiveTexture(GL_TEXTURE0 + textureID - 1);
+                glBindTexture(GL_TEXTURE_2D, textureID);
+
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+            
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_pixels);
+                glGenerateMipmap(GL_TEXTURE_2D);
+                stbi_image_free(texture_pixels);
+
+                current_face_data.alpha_texture = textureID;
+            }
+
 
             scene.faces.push_back(current_face_data);
         }
@@ -265,6 +327,8 @@ int main() try
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(0));
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(12));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(24));
         
         glGenVertexArrays(1, &debug_vao);
     }
@@ -377,8 +441,10 @@ int main() try
     
             glBindVertexArray(vao);
 
-            for (obj_data::face_data face : scene.faces)
+            for (obj_data::face_data face : scene.faces) {
+                glUniform1i(source_program.texture_location, face.albedo_texture);
                 glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
+            }
         }
 
         { // Draw debug
