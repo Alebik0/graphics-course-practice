@@ -27,18 +27,12 @@
 #include <glm/ext/scalar_constants.hpp>
 #include <glm/gtx/string_cast.hpp>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#define TINYOBJLOADER_USE_MAPBOX_EARCUT // Optional. define TINYOBJLOADER_USE_MAPBOX_EARCUT gives robust triangulation. Requires C++11
-#include "tiny_obj_loader.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
 #include "obj_parser.hpp"
 #include "source_shaders.hpp"
 #include "debug_shaders.hpp"
 #include "globals.hpp"
 #include "gl_init.hpp"
+#include "scene_init.hpp"
 
 
 std::string to_string(std::string_view str)
@@ -93,175 +87,6 @@ GLuint create_program(GLuint vertex_shader, GLuint fragment_shader)
     }
 
     return result;
-}
-
-obj_data load_scene(const std::string & scene_path, const std::string & scene_dir) {
-    obj_data scene;
-    std::string inputfile = scene_path;
-    std::string mtl_basedir = scene_dir;
-    bool triangulate = true;
-    tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-
-    std::string err;
-
-    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, inputfile.c_str(), mtl_basedir.c_str(), triangulate);
-
-    if (!err.empty()) {
-        std::cerr << err << std::endl;
-    }
-
-    if (!ret) {
-        exit(1);
-    }
-
-    std::vector<std::vector<obj_data::vertex>> vertices_grouped_by_material(materials.size());
-
-    // Loop over shapes
-    for (size_t s = 0; s < shapes.size(); s++) {
-        // Loop over faces(polygon)
-        size_t index_offset = 0;
-        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-            size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
-            size_t material_idx = shapes[s].mesh.material_ids[f];
-
-            // Loop over vertices in the face.
-            for (size_t v = 0; v < fv; v++) {
-                obj_data::vertex current_v;
-                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-                tinyobj::real_t vx = attrib.vertices[3*size_t(idx.vertex_index)+0];
-                tinyobj::real_t vy = attrib.vertices[3*size_t(idx.vertex_index)+1];
-                tinyobj::real_t vz = attrib.vertices[3*size_t(idx.vertex_index)+2];
-                current_v.position = { vx, vy, vz };                   
-
-                if (idx.normal_index >= 0) {
-                    tinyobj::real_t nx = attrib.normals[3*size_t(idx.normal_index)+0];
-                    tinyobj::real_t ny = attrib.normals[3*size_t(idx.normal_index)+1];
-                    tinyobj::real_t nz = attrib.normals[3*size_t(idx.normal_index)+2];
-                    current_v.normal = { nx, ny, nz };
-                }
-
-                if (idx.texcoord_index >= 0) {
-                    tinyobj::real_t tx = attrib.texcoords[2*size_t(idx.texcoord_index)+0];
-                    tinyobj::real_t ty = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
-                    current_v.texcoord = { tx, ty };
-                }
-
-                vertices_grouped_by_material[material_idx].push_back(current_v);
-            }
-            index_offset += fv;
-        }
-    }
-
-    for (size_t material_idx = 0; material_idx < materials.size(); material_idx++) {
-        obj_data::face_data current_face_data;
-        current_face_data.firstVertex = scene.vertices.size();
-
-        for (obj_data::vertex v : vertices_grouped_by_material[material_idx]) {
-            scene.vertices.push_back(v);
-        }
-
-        tinyobj::material_t material = materials.at(material_idx);
-        current_face_data.countVertex = scene.vertices.size() - current_face_data.firstVertex;
-        current_face_data.material_name = material.name;
-        current_face_data.albedo_texname = material.ambient_texname;
-        current_face_data.alpha_texname = material.alpha_texname;
-        current_face_data.glossiness = { material.specular[0], material.specular[1], material.specular[2] };
-        current_face_data.power = material.shininess;
-
-        if (current_face_data.albedo_texname != "") {
-            std::string texture_path = current_face_data.albedo_texname;
-            texture_path = texture_path.replace(texture_path.find("\\", 0), 1, "/");
-            texture_path = scene_dir + texture_path;
-
-            int texture_width, texture_height, texture_cpx;
-            unsigned char * texture_pixels = stbi_load(
-                texture_path.c_str(),
-                &texture_width,
-                &texture_height,
-                &texture_cpx,
-                4);
-
-            GLuint textureID;
-            glGenTextures(1, &textureID);
-            glBindTexture(GL_TEXTURE_2D, textureID);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-        
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_pixels);
-            glGenerateMipmap(GL_TEXTURE_2D);
-            stbi_image_free(texture_pixels);
-
-            current_face_data.albedo_texture = textureID;
-        } else {
-            current_face_data.albedo_texture = 0;
-        }
-
-        if (current_face_data.alpha_texname != "") {
-            std::string texture_path = current_face_data.alpha_texname;
-            texture_path = texture_path.replace(texture_path.find("\\", 0), 1, "/");
-            texture_path = scene_dir + texture_path;
-
-            int texture_width, texture_height, texture_cpx;
-            unsigned char * texture_pixels = stbi_load(
-                texture_path.c_str(),
-                &texture_width,
-                &texture_height,
-                &texture_cpx,
-                4);
-
-
-            GLuint textureID;
-            glGenTextures(1, &textureID);
-            glBindTexture(GL_TEXTURE_2D, textureID);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-        
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_pixels);
-            glGenerateMipmap(GL_TEXTURE_2D);
-            stbi_image_free(texture_pixels);
-
-            current_face_data.alpha_texture = textureID;
-        } else {
-            current_face_data.alpha_texture = 0;
-        }
-
-
-        scene.faces.push_back(current_face_data);
-    }
-
-    float minx = 1e9;
-    float miny = 1e9;
-    float minz = 1e9;
-    float maxx = -1e9;
-    float maxy = -1e9;
-    float maxz = -1e9;
-    
-    for (auto v: scene.vertices) {
-        minx = std::min(minx, v.position[0]);
-        miny = std::min(miny, v.position[1]);
-        minz = std::min(minz, v.position[2]);
-        maxx = std::max(maxx, v.position[0]);
-        maxy = std::max(maxy, v.position[1]);
-        maxz = std::max(maxz, v.position[2]);
-    }
-    
-    glm::vec3 scene_bouding_box_min(minx, miny, minz);
-    glm::vec3 scene_bouding_box_max(maxx, maxy, maxz);
-
-    std::cout << "Loaded:\n"
-              << "- shapes:     " << shapes.size() << "\n"
-              << "- materials:  " << materials.size() << "\n"
-              << "- vertices:   " << scene.vertices.size() << "\n"
-              << "- faces:      " << scene.faces.size() << "\n"
-              << "- bbox min:   " << scene_bouding_box_min.x << ' ' << scene_bouding_box_min.y << ' ' << scene_bouding_box_min.z << '\n'
-              << "- bbox max:   " << scene_bouding_box_max.x << ' ' << scene_bouding_box_max.y << ' ' << scene_bouding_box_max.z << '\n'
-              << std::endl;
-
-    return scene;
 }
 
 int main() try

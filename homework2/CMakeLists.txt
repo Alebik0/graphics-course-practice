@@ -33,6 +33,7 @@ add_executable(${TARGET_NAME}
 	source_shaders.hpp 
 	debug_shaders.hpp 
 	gl_init.hpp gl_init.cpp
+	scene_init.hpp scene_init.cpp
 	tiny_obj_loader.h 
 	stb_image.h)
 target_include_directories(${TARGET_NAME} PUBLIC
