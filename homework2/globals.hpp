@@ -24,7 +24,7 @@ const glm::vec3 UP(0.f, 1.f, 0.f);
 const glm::vec3 RGH(1.f, 0.f, 0.f);
 const glm::vec3 FWD(0.f, 0.f, 1.f);
 const glm::vec3 CLEAR_COLOR(0.8f, 0.8f, 1.0f);
-const glm::vec3 AMBIENT_COLOR(0.1f, 0.1f, 0.1f);
+const glm::vec3 AMBIENT_COLOR(0.3f, 0.3f, 0.3f);
 const glm::vec3 SUN_COLOR(1.0f, 0.95f, 0.9f);
 const glm::vec3 SUN_DIRECTION = UP + RGH;
 const glm::vec3 LIGHT_COLOR(1.f, 0.0f, 1.f);
