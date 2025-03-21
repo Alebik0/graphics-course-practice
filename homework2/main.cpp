@@ -248,6 +248,8 @@ int main() try
                 stbi_image_free(texture_pixels);
 
                 current_face_data.albedo_texture = textureID;
+            } else {
+                current_face_data.albedo_texture = 0;
             }
 
             if (current_face_data.alpha_texname != "") {
@@ -276,6 +278,8 @@ int main() try
                 stbi_image_free(texture_pixels);
 
                 current_face_data.alpha_texture = textureID;
+            } else {
+                current_face_data.alpha_texture = 0;
             }
 
 
@@ -442,8 +446,12 @@ int main() try
             glBindVertexArray(vao);
 
             for (obj_data::face_data face : scene.faces) {
-                glUniform1i(source_program.texture_location, face.albedo_texture);
-                glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
+                if (face.albedo_texture != 0)
+                    glUniform1i(source_program.albedo_texture_location, face.albedo_texture);
+                if (face.alpha_texture != 0)
+                    glUniform1i(source_program.alpha_texture_location, face.alpha_texture);
+
+                    glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
             }
         }
 

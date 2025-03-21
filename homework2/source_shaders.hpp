@@ -47,11 +47,12 @@ in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
-uniform sampler2D textureSample;
+uniform sampler2D albedoTexture;
+uniform sampler2D alphaTexture;
 
 void main()
 {
-    vec3 alb = texture(textureSample, texcoord).rgb;
+    vec3 alb = texture(albedoTexture, texcoord).rgb;
     vec3 ambient_color = alb * ambient_light;
     vec3 sun_color = alb * max(0.0, dot(normal, sun_direction)) * sun_color;
     vec3 color = ambient_color + sun_color;
@@ -75,7 +76,8 @@ struct source_shader_program
     GLuint ambient_light_location;
     GLuint sun_direction_location;
     GLuint sun_color_location;
-    GLuint texture_location;
+    GLuint albedo_texture_location;
+    GLuint alpha_texture_location;
 
     source_shader_program(GLuint program, GLuint vertex_shader, GLuint fragment_shader) :
         program(program),
@@ -89,5 +91,6 @@ struct source_shader_program
         ambient_light_location(glGetUniformLocation(program, "ambient_light")),
         sun_direction_location(glGetUniformLocation(program, "sun_direction")),
         sun_color_location(glGetUniformLocation(program, "sun_color")),
-        texture_location(glGetUniformLocation(program, "textureSample")) {}
+        albedo_texture_location(glGetUniformLocation(program, "albedoTexture")),
+        alpha_texture_location(glGetUniformLocation(program, "alphaTexture")) {}
 };
