@@ -77,6 +77,7 @@ uniform vec3 camera_position;
 
 uniform sampler2D albedo_texture;
 uniform sampler2D normal_texture;
+uniform sampler2D environment_texture;
 
 in vec3 position;
 in vec3 tangent;
@@ -96,10 +97,19 @@ void main()
     vec3 nmap_value = texture(normal_texture, texcoord).rgb;
     vec3 adj_nmap_value = nmap_value * 2.0 - vec3(1.0);
     vec3 real_normal = tbn * adj_nmap_value;
+    real_normal = normalize(mix(normal, real_normal, 0.5));
 
     vec3 albedo = texture(albedo_texture, texcoord).rgb;
     float lightness = ambient_light + max(0.0, dot(normalize(real_normal), light_direction));
-    vec3 color = lightness * albedo;
+
+    vec3 on_camera = camera_position - position;
+    vec3 reflected = -normalize(on_camera) + 2 * normalize(real_normal);
+    float x = atan(reflected.z, reflected.x) / PI * 0.5 + 0.5;
+    float y = -atan(reflected.y, length(reflected.xz)) / PI + 0.5;
+
+    vec3 old_color = lightness * albedo;
+    vec3 new_color = texture(environment_texture, vec2(x, y)).rgb;
+    vec3 color = (old_color + new_color) / 2.0;
 
     out_color = vec4(color, 1.0);
 }
@@ -259,6 +269,7 @@ int main() try
     GLuint camera_position_location = glGetUniformLocation(program, "camera_position");
     GLuint albedo_texture_location = glGetUniformLocation(program, "albedo_texture");
     GLuint normal_texture_location = glGetUniformLocation(program, "normal_texture");
+    GLuint environment_texture_location = glGetUniformLocation(program, "environment_texture");
 
     GLuint sphere_vao, sphere_vbo, sphere_ebo;
     glGenVertexArrays(1, &sphere_vao);
@@ -289,6 +300,7 @@ int main() try
     std::string project_root = PROJECT_ROOT;
     GLuint albedo_texture = load_texture(project_root + "/textures/brick_albedo.jpg");
     GLuint normal_texture = load_texture(project_root + "/textures/brick_normal.jpg");
+    GLuint environment_texture = load_texture(project_root + "/textures/environment_map.jpg");
 
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
@@ -375,12 +387,16 @@ int main() try
         glUniform3fv(camera_position_location, 1, reinterpret_cast<float *>(&camera_position));
         glUniform1i(albedo_texture_location, 0);
         glUniform1i(normal_texture_location, 1);
+        glUniform1i(environment_texture_location, 2);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, albedo_texture);
 
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, normal_texture);
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, environment_texture);
 
         glBindVertexArray(sphere_vao);
         glDrawElements(GL_TRIANGLES, sphere_index_count, GL_UNSIGNED_INT, nullptr);
