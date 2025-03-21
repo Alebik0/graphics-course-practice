@@ -43,6 +43,10 @@ const float CAMERA_ROTATION_SPEED = glm::pi<float>() / 2;
 const glm::vec3 UP(0.f, -1.f, 0.f);
 const glm::vec3 RGH(1.f, 0.f, 0.f);
 const glm::vec3 FWD(0.f, 0.f, 1.f);
+const glm::vec3 CLEAR_COLOR(0.8f, 0.8f, 1.0f);
+const glm::vec3 AMBIENT_COLOR(0.1f, 0.1f, 0.1f);
+const glm::vec3 SUN_COLOR(1.0f, 0.95f, 0.9f);
+const glm::vec3 SUN_DIRECTION = -UP - RGH;
 
 std::string to_string(std::string_view str)
 {
@@ -436,7 +440,7 @@ int main() try
     
             glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
     
-            glClearColor(0.5f, 0.f, 0.5f, 1.0f);
+            glClearColor(CLEAR_COLOR.r, CLEAR_COLOR.g, CLEAR_COLOR.b, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glEnable(GL_DEPTH_TEST);
             glEnable(GL_CULL_FACE);
@@ -446,10 +450,9 @@ int main() try
             glUniformMatrix4fv(source_program.view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
             glUniformMatrix4fv(source_program.projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
             glUniform3fv(source_program.camera_position_location, 1, (float *) (&camera_position));
-            glUniform3f(source_program.albedo_location, 0.7f, 0.4f, 0.2f);
-            glUniform3f(source_program.ambient_light_location, 0.2f, 0.2f, 0.2f);
-            glUniform3f(source_program.sun_direction_location, (-UP - RGH).x, (-UP - RGH).y, (-UP - RGH).z);
-            glUniform3f(source_program.sun_color_location, 1.0f, 0.9f, 0.8f);
+            glUniform3f(source_program.ambient_light_location, AMBIENT_COLOR.r, AMBIENT_COLOR.g, AMBIENT_COLOR.b);
+            glUniform3f(source_program.sun_direction_location, SUN_DIRECTION.x, SUN_DIRECTION.y, SUN_DIRECTION.z);
+            glUniform3f(source_program.sun_color_location, SUN_COLOR.r, SUN_COLOR.g, SUN_COLOR.b);
     
             glBindVertexArray(vao);
 

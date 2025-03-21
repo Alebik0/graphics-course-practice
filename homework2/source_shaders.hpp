@@ -35,7 +35,6 @@ const char fragment_shader_source[] =
 R"(#version 330 core
 
 uniform vec3 camera_position;
-uniform vec3 albedo;
 
 uniform vec3 ambient_light;
 uniform vec3 sun_direction;
@@ -56,9 +55,9 @@ void main()
     if (hasAlphaTexture > 0.5 && texture(alphaTexture, texcoord).r < 0.5) {
         discard;
     } else {
-        vec3 alb = texture(albedoTexture, texcoord).rgb;
-        vec3 ambient_color = alb * ambient_light;
-        vec3 sun_color = alb * max(0.0, dot(normal, sun_direction)) * sun_color;
+        vec3 albedo = texture(albedoTexture, texcoord).rgb;
+        vec3 ambient_color = albedo * ambient_light;
+        vec3 sun_color = albedo * max(0.0, dot(normal, sun_direction)) * sun_color;
         vec3 color = ambient_color + sun_color;
         
         out_color = vec4(color, 1.0);
@@ -77,7 +76,6 @@ struct source_shader_program
     GLuint projection_location;
 
     GLuint camera_position_location;
-    GLuint albedo_location;
     GLuint ambient_light_location;
     GLuint sun_direction_location;
     GLuint sun_color_location;
@@ -93,7 +91,6 @@ struct source_shader_program
         view_location(glGetUniformLocation(program, "view")),
         projection_location(glGetUniformLocation(program, "projection")),
         camera_position_location(glGetUniformLocation(program, "camera_position")),
-        albedo_location(glGetUniformLocation(program, "albedo")),
         ambient_light_location(glGetUniformLocation(program, "ambient_light")),
         sun_direction_location(glGetUniformLocation(program, "sun_direction")),
         sun_color_location(glGetUniformLocation(program, "sun_color")),
