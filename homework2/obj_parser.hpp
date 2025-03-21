@@ -37,4 +37,6 @@ struct obj_data
 
     std::vector<vertex> vertices;
     std::vector<face_data> faces;
+    glm::vec3 bbox_min;
+    glm::vec3 bbox_max;
 };

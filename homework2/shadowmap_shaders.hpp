@@ -17,7 +17,11 @@ void main()
 const char shadowmap_fragment_shader[] =
 R"(#version 330 core
 
+out vec4 shadow_output;
+
 void main()
 {
+    float z = gl_FragCoord.z;
+    shadow_output = vec4(z, z * z + 1.0 / 4 * (dFdx(z) * dFdx(z) + dFdy(z) * dFdy(z)), 0, 0);
 }
 )";

@@ -88,7 +88,7 @@ int main() try
     std::string scene_path = project_root + "/data/sponza/sponza.obj";
     std::string scene_dir = project_root + "/data/sponza/";
     obj_data scene = load_scene(scene_path, scene_dir);
-    gl_data scene_gl_data = init_gl(scene);
+    gl_data scene_gl_data = init_gl(width, height, scene);
 
     float time = 0.f;
     bool paused = false;
@@ -172,39 +172,40 @@ int main() try
         glm::vec3 sun_direction = UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f);
         glm::mat4 shadowmap_projection(1.f);
 
+        { // Init shadowmap shadowmap_projection
+            glm::vec3 C(0.f);
+            glm::vec3 light_z = -glm::normalize(sun_direction);
+            glm::vec3 light_x = glm::normalize(glm::cross(light_z, {0.f, 1.f, 0.f}));
+            glm::vec3 light_y = glm::cross(light_x, light_z);
+
+            float max_value_x = 0;
+            float max_value_y = 0;
+            float max_value_z = 0;
+            for (float v_x : {scene.bbox_min.x, scene.bbox_max.x}) {
+                for (float v_y : {scene.bbox_min.y, scene.bbox_max.y}) {
+                    for (float v_z : {scene.bbox_min.z, scene.bbox_max.z}) {
+                        glm::vec3 V = glm::vec3(v_x, v_y, v_z);
+                        max_value_x = std::max(max_value_x, abs(glm::dot(V - C, light_x)));
+                        max_value_y = std::max(max_value_y, abs(glm::dot(V - C, light_y)));
+                        max_value_z = std::max(max_value_z, abs(glm::dot(V - C, light_z)));
+                    }
+                }
+            }
+
+            shadowmap_projection[0] = {max_value_x * light_x, 0};
+            shadowmap_projection[1] = {max_value_y * light_y, 0};
+            shadowmap_projection[2] = {max_value_z * light_z, 0};
+            shadowmap_projection[3] = {C, 1};
+
+            shadowmap_projection = glm::inverse(shadowmap_projection);
+        }
+
         { // Draw shadowmap
             glm::mat4 model(1.f);
 
-            { // Init shadowmap shadowmap_projection
-                glm::vec3 C(0.f);
-                glm::vec3 light_z = -glm::normalize(sun_direction);
-                glm::vec3 light_x = glm::normalize(glm::cross(light_z, {0.f, 1.f, 0.f}));
-                glm::vec3 light_y = glm::cross(light_x, light_z);
-    
-                float max_value_x = 0;
-                float max_value_y = 0;
-                float max_value_z = 0;
-                for (float v_x : {-2000.f, 2000.f}) {
-                    for (float v_y : {-200.f, 200.f}) {
-                        for (float v_z : {-2000.f, 2000.f}) {
-                            glm::vec3 V = glm::vec3(v_x, v_y, v_z);
-                            max_value_x = std::max(max_value_x, abs(glm::dot(V - C, light_x)));
-                            max_value_y = std::max(max_value_y, abs(glm::dot(V - C, light_y)));
-                            max_value_z = std::max(max_value_z, abs(glm::dot(V - C, light_z)));
-                        }
-                    }
-                }
-    
-                shadowmap_projection[0] = {max_value_x * light_x, 0};
-                shadowmap_projection[1] = {max_value_y * light_y, 0};
-                shadowmap_projection[2] = {max_value_z * light_z, 0};
-                shadowmap_projection[3] = {C, 1};
-    
-                shadowmap_projection = glm::inverse(shadowmap_projection);
-            }
-
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, scene_gl_data.shadow_fbo);
             glViewport(0, 0, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION);
+            glClearColor(1.f, 1.f, 0.f, 0.f);
             glClear(GL_DEPTH_BUFFER_BIT);
 
             glEnable(GL_DEPTH_TEST);

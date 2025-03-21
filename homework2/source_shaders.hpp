@@ -54,7 +54,7 @@ uniform sampler2D albedoTexture;
 uniform sampler2D alphaTexture;
 uniform float hasAlphaTexture;
 
-uniform sampler2DShadow shadowmapTexture;
+uniform sampler2D shadowmapTexture;
 uniform mat4 shadowmap_projection;
 
 in vec3 position;
@@ -91,31 +91,17 @@ void main()
 
     vec3 color = ambient_color;
 
-    vec4 ndc = shadowmap_projection * vec4(position, 1.0);
-
-    if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
-        vec3 shadowmap_texcoord = ndc.xyz * 0.5 + 0.5;
-
-        float sum = 0.0;
-        float sum_w = 0.0;
-        const int N = 8;
-        float radius = 50.0;
-        for (int x = -N; x <= N; ++x) {
-            for (int y = -N; y <= N; ++y) {
-                float c = exp(-float(x * x + y * y) / (radius * radius));
-                vec3 delta = vec3(x, y, 0.0) / vec3(textureSize(shadowmapTexture, 0), 1.0);
-                vec3 curr_texcoord = shadowmap_texcoord + delta;
-                sum += c * texture(shadowmapTexture, curr_texcoord);
-                sum_w += c;
-            }
-        }
-
-        if (sum / sum_w > 0.5) {
-            color += sun_color;
-        }
-    } else {
-        color += sun_color;
-    }    
+    vec4 shadow_pos = shadowmap_projection * vec4(position, 1.0);
+    shadow_pos /= shadow_pos.w;
+    shadow_pos = shadow_pos * 0.5 + vec4(0.5);
+    vec2 data = texture(shadowmapTexture, shadow_pos.xy).rg;
+    float mu = data.r;
+    float sigma = data.g - mu * mu;
+    float z = shadow_pos.z - 0.01;
+    float factor = (z < mu) ? 1.0 : sigma / (sigma + (z - mu) * (z - mu));
+    float delta = 0.125;
+    float shadow_factor = factor < delta ? 0.0 : (factor - delta) / (1 - delta);
+    color += sun_color * shadow_factor;
 
     color += light_color;
 

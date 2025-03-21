@@ -53,6 +53,7 @@ struct gl_data {
     GLuint debug_vao;
     GLuint shadow_map;
     GLuint shadow_fbo;
+    GLuint shadow_rbo;
 };
 
-gl_data init_gl(const obj_data & scene);
+gl_data init_gl(const int width, const int height, const obj_data & scene);

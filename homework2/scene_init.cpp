@@ -162,14 +162,6 @@ obj_data make_scene(
         scene.faces.push_back(current_face_data);
     }
 
-    return scene;
-}
-
-void log_scene(
-    const obj_data & scene,
-    const std::vector<tinyobj::shape_t> & shapes,
-    const std::vector<tinyobj::material_t> & materials
-) {
     float minx = 1e9;
     float miny = 1e9;
     float minz = 1e9;
@@ -185,17 +177,25 @@ void log_scene(
         maxy = std::max(maxy, v.position[1]);
         maxz = std::max(maxz, v.position[2]);
     }
-    
-    glm::vec3 scene_bouding_box_min(minx, miny, minz);
-    glm::vec3 scene_bouding_box_max(maxx, maxy, maxz);
 
+    scene.bbox_min = glm::vec3(minx, miny, minz);
+    scene.bbox_max = glm::vec3(maxx, maxy, maxz);
+
+    return scene;
+}
+
+void log_scene(
+    const obj_data & scene,
+    const std::vector<tinyobj::shape_t> & shapes,
+    const std::vector<tinyobj::material_t> & materials
+) {
     std::cout << "Loaded:\n"
               << "- shapes:     " << shapes.size() << "\n"
               << "- materials:  " << materials.size() << "\n"
               << "- vertices:   " << scene.vertices.size() << "\n"
               << "- faces:      " << scene.faces.size() << "\n"
-              << "- bbox min:   " << scene_bouding_box_min.x << ' ' << scene_bouding_box_min.y << ' ' << scene_bouding_box_min.z << '\n'
-              << "- bbox max:   " << scene_bouding_box_max.x << ' ' << scene_bouding_box_max.y << ' ' << scene_bouding_box_max.z << '\n'
+              << "- bbox min:   " << scene.bbox_min.x << ' ' << scene.bbox_min.y << ' ' << scene.bbox_min.z << '\n'
+              << "- bbox max:   " << scene.bbox_max.x << ' ' << scene.bbox_max.y << ' ' << scene.bbox_max.z << '\n'
               << std::endl;
 }
 
