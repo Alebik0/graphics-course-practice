@@ -31,6 +31,7 @@
 #include "globals.hpp"
 #include "gl_init.hpp"
 #include "scene_init.hpp"
+#include "draw.hpp"
 
 
 std::string to_string(std::string_view str)
@@ -46,6 +47,39 @@ void sdl2_fail(std::string_view message)
 void glew_fail(std::string_view message, GLenum error)
 {
     throw std::runtime_error(to_string(message) + reinterpret_cast<const char *>(glewGetErrorString(error)));
+}
+
+glm::mat4 make_sun_shadowmap_projection(
+    const obj_data & scene,
+    const glm::vec3 & sun_direction
+) {
+    glm::vec3 C(0.f);
+    glm::vec3 light_z = -glm::normalize(sun_direction);
+    glm::vec3 light_x = glm::normalize(glm::cross(light_z, {0.f, 1.f, 0.f}));
+    glm::vec3 light_y = glm::cross(light_x, light_z);
+
+    float max_value_x = 0;
+    float max_value_y = 0;
+    float max_value_z = 0;
+    for (float v_x : {scene.bbox_min.x, scene.bbox_max.x}) {
+        for (float v_y : {scene.bbox_min.y, scene.bbox_max.y}) {
+            for (float v_z : {scene.bbox_min.z, scene.bbox_max.z}) {
+                glm::vec3 V = glm::vec3(v_x, v_y, v_z);
+                max_value_x = std::max(max_value_x, abs(glm::dot(V - C, light_x)));
+                max_value_y = std::max(max_value_y, abs(glm::dot(V - C, light_y)));
+                max_value_z = std::max(max_value_z, abs(glm::dot(V - C, light_z)));
+            }
+        }
+    }
+
+    glm::mat4 shadowmap_projection(1.f);
+    shadowmap_projection[0] = {max_value_x * light_x, 0};
+    shadowmap_projection[1] = {max_value_y * light_y, 0};
+    shadowmap_projection[2] = {max_value_z * light_z, 0};
+    shadowmap_projection[3] = {C, 1};
+    shadowmap_projection = glm::inverse(shadowmap_projection);
+
+    return shadowmap_projection;
 }
 
 int main() try
@@ -170,136 +204,12 @@ int main() try
         }
 
         glm::vec3 sun_direction = UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f);
-        glm::mat4 shadowmap_projection(1.f);
+        glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun_direction);
 
-        { // Init shadowmap shadowmap_projection
-            glm::vec3 C(0.f);
-            glm::vec3 light_z = -glm::normalize(sun_direction);
-            glm::vec3 light_x = glm::normalize(glm::cross(light_z, {0.f, 1.f, 0.f}));
-            glm::vec3 light_y = glm::cross(light_x, light_z);
-
-            float max_value_x = 0;
-            float max_value_y = 0;
-            float max_value_z = 0;
-            for (float v_x : {scene.bbox_min.x, scene.bbox_max.x}) {
-                for (float v_y : {scene.bbox_min.y, scene.bbox_max.y}) {
-                    for (float v_z : {scene.bbox_min.z, scene.bbox_max.z}) {
-                        glm::vec3 V = glm::vec3(v_x, v_y, v_z);
-                        max_value_x = std::max(max_value_x, abs(glm::dot(V - C, light_x)));
-                        max_value_y = std::max(max_value_y, abs(glm::dot(V - C, light_y)));
-                        max_value_z = std::max(max_value_z, abs(glm::dot(V - C, light_z)));
-                    }
-                }
-            }
-
-            shadowmap_projection[0] = {max_value_x * light_x, 0};
-            shadowmap_projection[1] = {max_value_y * light_y, 0};
-            shadowmap_projection[2] = {max_value_z * light_z, 0};
-            shadowmap_projection[3] = {C, 1};
-
-            shadowmap_projection = glm::inverse(shadowmap_projection);
-        }
-
-        { // Draw shadowmap
-            glm::mat4 model(1.f);
-
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, scene_gl_data.shadow_fbo);
-            glViewport(0, 0, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION);
-            glClearColor(1.f, 1.f, 0.f, 0.f);
-            glClear(GL_DEPTH_BUFFER_BIT);
-
-            glEnable(GL_DEPTH_TEST);
-            glEnable(GL_CULL_FACE);
-            glCullFace(GL_FRONT);
-
-            glUseProgram(scene_gl_data.shadowmap_program);
-
-            glUniformMatrix4fv(scene_gl_data.shadowmap__model, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-            glUniformMatrix4fv(scene_gl_data.shadowmap__projection, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
-
-            { // Draw full scene
-                glBindVertexArray(scene_gl_data.vao);
-
-                for (obj_data::face_data face : scene.faces) {
-                    glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
-                }
-            }
-        }
-
-        { // Draw scene
-            glm::mat4 model(1.f);
-    
-            glm::mat4 view(1.f);
-            view = glm::rotate(view, camera_angle, UP);
-            view = glm::translate(view, -camera_position);
-    
-            glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, (1.f * width) / height, near, far);
-    
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-            glClearColor(CLEAR_COLOR.r, CLEAR_COLOR.g, CLEAR_COLOR.b, 1.0f);
-            glViewport(0, 0, width, height);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            glEnable(GL_DEPTH_TEST);
-            glEnable(GL_CULL_FACE);
-            glCullFace(GL_BACK);
-
-            glUseProgram(scene_gl_data.source_program);
-            glUniformMatrix4fv(scene_gl_data.source__model, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-            glUniformMatrix4fv(scene_gl_data.source__view, 1, GL_FALSE, reinterpret_cast<float *>(&view));
-            glUniformMatrix4fv(scene_gl_data.source__projection, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
-
-            glUniform3f(scene_gl_data.source__ambient_light, AMBIENT_COLOR.r, AMBIENT_COLOR.g, AMBIENT_COLOR.b);
-            
-            glUniform3f(scene_gl_data.source__sun_direction, SUN_DIRECTION.x, SUN_DIRECTION.y, SUN_DIRECTION.z);
-            glUniform3f(scene_gl_data.source__sun_color, SUN_COLOR.r, SUN_COLOR.g, SUN_COLOR.b);
-
-            glm::vec3 current_light_position = LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.3f);
-            glUniform3f(scene_gl_data.source__point_light_position, current_light_position.x, current_light_position.y, current_light_position.z);
-            glUniform3f(scene_gl_data.source__point_light_color, LIGHT_COLOR.r, LIGHT_COLOR.g, LIGHT_COLOR.b);
-            glUniform3f(scene_gl_data.source__point_light_attenuation, LIGHT_ATTENUATION.x, LIGHT_ATTENUATION.y, LIGHT_ATTENUATION.z);
-            
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D, scene_gl_data.shadow_map);
-            glUniform1i(scene_gl_data.source__shadowmap_texture, 2);
-            glUniformMatrix4fv(scene_gl_data.source__shadowmap_projection, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
-            
-            { // Draw full scene
-                glBindVertexArray(scene_gl_data.vao);
-
-                for (obj_data::face_data face : scene.faces) {
-                    glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, face.albedo_texture);
-                    glUniform1i(scene_gl_data.source__albedo_texture, 0);
-
-                    if (face.alpha_texture != 0) {
-                        glActiveTexture(GL_TEXTURE1);
-                        glBindTexture(GL_TEXTURE_2D, face.alpha_texture);
-                        glUniform1i(scene_gl_data.source__alpha_texture, 1);
-                        glUniform1f(scene_gl_data.source__has_alpha_texture, 1.0f);
-                    } else {
-                        glUniform1f(scene_gl_data.source__has_alpha_texture, 0.0f);
-                    }
-
-                    glUniform3f(scene_gl_data.source__glossiness, face.glossiness[0], face.glossiness[1], face.glossiness[2]);
-                    glUniform1f(scene_gl_data.source__roughness, face.power);
-
-                    glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
-                }
-            }
-        }
-
-        { // Draw debug
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-            glDisable(GL_DEPTH_TEST);
-
-            glUseProgram(scene_gl_data.debug_program);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, scene_gl_data.shadow_map);
-            glUniform1i(scene_gl_data.debug__shadowmap_texture, 0);
-
-            glBindVertexArray(scene_gl_data.debug_vao);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
+        draw_shadowmap(scene, scene_gl_data, shadowmap_projection);
+        draw_scene(scene, scene_gl_data, camera_position, camera_angle, width, height, near, far, time, shadowmap_projection);
+        draw_debug(scene, scene_gl_data);
+        
 
         SDL_GL_SwapWindow(window);
     }

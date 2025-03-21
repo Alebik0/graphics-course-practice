@@ -80,21 +80,28 @@ void main()
         discard;
 
     albedo = texture(albedoTexture, texcoord).rgb;
+    vec3 color = vec3(0.0);
+    
     vec3 ambient_color = albedo * ambient_light;
+    color += ambient_color;
+
     vec3 sun_color = diffuse(sun_direction) * sun_color;
-
-    float distance = length(point_light_position - position);
-    float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
-    float light_attenuation = 1.0 / divider;
-    vec3 light_vector = normalize(position - point_light_position);
-    vec3 light_color = (diffuse(-light_vector) + specular(-light_vector)) * light_attenuation * point_light_color;
-
-    vec3 color = ambient_color;
-
     vec4 shadow_pos = shadowmap_projection * vec4(position, 1.0);
     shadow_pos /= shadow_pos.w;
     shadow_pos = shadow_pos * 0.5 + vec4(0.5);
-    vec2 data = texture(shadowmapTexture, shadow_pos.xy).rg;
+
+    vec2 sum = vec2(0.0);
+    vec2 sum_w = vec2(0.0);
+    const int N = 5;
+    float radius = 100.0;
+    for (int x = -N; x <= N; ++x) {
+        for (int y = -N; y <= N; ++y) {
+            float c = exp(-float(x * x + y * y) / (radius*radius));
+            sum += c * texture(shadowmapTexture, shadow_pos.xy + vec2(x,y) / vec2(textureSize(shadowmapTexture, 0))).rg;
+            sum_w += c;
+        }
+    }
+    vec2 data = sum / sum_w;
     float mu = data.r;
     float sigma = data.g - mu * mu;
     float z = shadow_pos.z - 0.01;
@@ -103,6 +110,11 @@ void main()
     float shadow_factor = factor < delta ? 0.0 : (factor - delta) / (1 - delta);
     color += sun_color * shadow_factor;
 
+    float distance = length(point_light_position - position);
+    float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
+    float light_attenuation = 1.0 / divider;
+    vec3 light_vector = normalize(position - point_light_position);
+    vec3 light_color = (diffuse(-light_vector) + specular(-light_vector)) * light_attenuation * point_light_color;
     color += light_color;
 
     out_color = vec4(color, 1.0);
