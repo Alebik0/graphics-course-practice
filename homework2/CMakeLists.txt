@@ -30,8 +30,7 @@ include_directories("shaders/")
 add_executable(${TARGET_NAME} 
 	main.cpp 
 	obj_parser.hpp 
-	source_shaders.hpp 
-	debug_shaders.hpp 
+	source_shaders.hpp debug_shaders.hpp shadowmap_shaders.hpp 
 	gl_init.hpp gl_init.cpp
 	scene_init.hpp scene_init.cpp
 	tiny_obj_loader.h 

@@ -23,12 +23,15 @@ void main()
 
 const char * debug_fragment_shader = 
     R"(#version 330 core
+
+uniform sampler2D shadowmapTexture;
+
 in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
 void main()
 {
-    out_color = vec4(texcoord, 0.0, 1.0);
+    out_color = texture(shadowmapTexture, texcoord);
 }
 )";

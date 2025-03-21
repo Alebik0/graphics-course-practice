@@ -15,11 +15,36 @@
 struct gl_data {
     GLuint source_vertex_shader;
     GLuint source_fragment_shader;
+    GLuint source_program;
+
+    GLuint source__model;
+    GLuint source__view;
+    GLuint source__projection;
+
+    GLuint source__ambient_light;
+    GLuint source__sun_direction;
+    GLuint source__sun_color;
+    GLuint source__point_light_position;
+    GLuint source__point_light_color;
+    GLuint source__point_light_attenuation;
+    GLuint source__glossiness;
+    GLuint source__roughness;
+    GLuint source__albedo_texture;
+    GLuint source__alpha_texture;
+    GLuint source__has_alpha_texture;
+
+    GLuint debug_program;
     GLuint debug_vertex_shader;
     GLuint debug_fragment_shader;
 
-    source_shader_program source_program;
-    GLuint debug_program;
+    GLuint debug__shadowmap_texture;
+
+    GLuint shadowmap_program;
+    GLuint shadowmap_vertex_shader;
+    GLuint shadowmap_fragment_shader;
+
+    GLuint shadowmap__model;
+    GLuint shadowmap__projection;
 
     GLuint vao;
     GLuint vbo;
