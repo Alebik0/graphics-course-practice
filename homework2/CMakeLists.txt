@@ -27,7 +27,14 @@ set(TARGET_NAME "${PROJECT_NAME}")
 set(PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 
 include_directories("shaders/")
-add_executable(${TARGET_NAME} main.cpp obj_parser.hpp source_shaders.hpp debug_shaders.hpp tiny_obj_loader.h stb_image.h)
+add_executable(${TARGET_NAME} 
+	main.cpp 
+	obj_parser.hpp 
+	source_shaders.hpp 
+	debug_shaders.hpp 
+	gl_init.hpp gl_init.cpp
+	tiny_obj_loader.h 
+	stb_image.h)
 target_include_directories(${TARGET_NAME} PUBLIC
 	"${SDL2_INCLUDE_DIRS}"
 	"${GLEW_INCLUDE_DIRS}"
