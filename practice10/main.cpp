@@ -94,8 +94,12 @@ void main()
     float lightness = ambient_light + max(0.0, dot(normalize(normal), light_direction));
 
     vec3 albedo = texture(albedo_texture, texcoord).rgb;
-    albedo = normal * 0.5 + vec3(0.5);
-    albedo = texture(normal_texture, texcoord).rgb;
+    vec3 bitangent = cross(normal, tangent);
+    mat3 tbn = mat3(tangent, bitangent, normal);
+    vec3 nmap_value = texture(normal_texture, texcoord).rgb;
+    vec3 adj_nmap_value = nmap_value * 1 - vec3(1.0);
+    vec3 real_normal = tbn * adj_nmap_value;
+    albedo = real_normal * 0.5 + vec3(0.5);
 
     out_color = vec4(lightness * albedo, 1.0);
 }
