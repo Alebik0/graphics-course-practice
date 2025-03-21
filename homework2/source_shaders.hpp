@@ -54,7 +54,7 @@ uniform sampler2D albedoTexture;
 uniform sampler2D alphaTexture;
 uniform float hasAlphaTexture;
 
-uniform sampler2D shadowmapTexture;
+uniform sampler2DShadow shadowmapTexture;
 uniform mat4 shadowmap_projection;
 
 in vec3 position;
@@ -94,10 +94,10 @@ void main()
     vec4 ndc = shadowmap_projection * vec4(position, 1.0);
 
     if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
-        vec2 shadowmap_texcoord = ndc.xy * 0.5 + 0.5;
+        vec3 shadowmap_texcoord = ndc.xyz * 0.5 + 0.5;
         float shadow_depth = ndc.z * 0.5 + 0.5;
 
-        if (texture(shadowmapTexture, shadowmap_texcoord).r < shadow_depth) {
+        if (texture(shadowmapTexture, shadowmap_texcoord) < 0.5) {
         } else {
             color += sun_color;
         }
