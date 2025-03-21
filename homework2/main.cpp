@@ -236,9 +236,7 @@ int main() try
 
                 GLuint textureID;
                 glGenTextures(1, &textureID);
-                glActiveTexture(GL_TEXTURE0 + textureID - 1);
                 glBindTexture(GL_TEXTURE_2D, textureID);
-
 
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
@@ -246,6 +244,11 @@ int main() try
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_pixels);
                 glGenerateMipmap(GL_TEXTURE_2D);
                 stbi_image_free(texture_pixels);
+
+                std::cout << "Loaded albedo " << texture_path << "\n" 
+                    << "- " << texture_width << "x" << texture_height << "\n"
+                    << "- textureID=" << textureID
+                    << std::endl;
 
                 current_face_data.albedo_texture = textureID;
             } else {
@@ -265,17 +268,22 @@ int main() try
                     &texture_cpx,
                     4);
 
+
                 GLuint textureID;
                 glGenTextures(1, &textureID);
-                glActiveTexture(GL_TEXTURE0 + textureID - 1);
                 glBindTexture(GL_TEXTURE_2D, textureID);
 
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
             
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_pixels);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_pixels);
                 glGenerateMipmap(GL_TEXTURE_2D);
                 stbi_image_free(texture_pixels);
+
+                std::cout << "Loaded alpha " << texture_path << "\n" 
+                    << "- " << texture_width << "x" << texture_height << "\n"
+                    << "- textureID=" << textureID
+                    << std::endl;
 
                 current_face_data.alpha_texture = textureID;
             } else {
@@ -446,12 +454,21 @@ int main() try
             glBindVertexArray(vao);
 
             for (obj_data::face_data face : scene.faces) {
-                if (face.albedo_texture != 0)
-                    glUniform1i(source_program.albedo_texture_location, face.albedo_texture);
-                if (face.alpha_texture != 0)
-                    glUniform1i(source_program.alpha_texture_location, face.alpha_texture);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, face.albedo_texture);
+                glUniform1i(source_program.albedo_texture_location, 0);
 
-                    glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
+                if (face.alpha_texture != 0) {
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, face.alpha_texture);
+                    glUniform1i(source_program.alpha_texture_location, 1);
+                    glUniform1f(source_program.has_alpha_texture_location, 1.0f);
+                } else {
+                    glUniform1f(source_program.has_alpha_texture_location, 0.0f);
+                }
+
+
+                glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
             }
         }
 

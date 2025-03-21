@@ -49,15 +49,20 @@ layout (location = 0) out vec4 out_color;
 
 uniform sampler2D albedoTexture;
 uniform sampler2D alphaTexture;
+uniform float hasAlphaTexture;
 
 void main()
 {
-    vec3 alb = texture(albedoTexture, texcoord).rgb;
-    vec3 ambient_color = alb * ambient_light;
-    vec3 sun_color = alb * max(0.0, dot(normal, sun_direction)) * sun_color;
-    vec3 color = ambient_color + sun_color;
-    
-    out_color = vec4(color, 1.0);
+    if (hasAlphaTexture > 0.5 && texture(alphaTexture, texcoord).r < 0.5) {
+        discard;
+    } else {
+        vec3 alb = texture(albedoTexture, texcoord).rgb;
+        vec3 ambient_color = alb * ambient_light;
+        vec3 sun_color = alb * max(0.0, dot(normal, sun_direction)) * sun_color;
+        vec3 color = ambient_color + sun_color;
+        
+        out_color = vec4(color, 1.0);
+    }
 }
 )";
 
@@ -78,6 +83,7 @@ struct source_shader_program
     GLuint sun_color_location;
     GLuint albedo_texture_location;
     GLuint alpha_texture_location;
+    GLuint has_alpha_texture_location;
 
     source_shader_program(GLuint program, GLuint vertex_shader, GLuint fragment_shader) :
         program(program),
@@ -92,5 +98,6 @@ struct source_shader_program
         sun_direction_location(glGetUniformLocation(program, "sun_direction")),
         sun_color_location(glGetUniformLocation(program, "sun_color")),
         albedo_texture_location(glGetUniformLocation(program, "albedoTexture")),
-        alpha_texture_location(glGetUniformLocation(program, "alphaTexture")) {}
+        alpha_texture_location(glGetUniformLocation(program, "alphaTexture")),
+        has_alpha_texture_location(glGetUniformLocation(program, "hasAlphaTexture")) {}
 };
