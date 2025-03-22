@@ -291,8 +291,6 @@ int main() try
 
     float time = 0.f;
 
-    std::map<SDL_Keycode, bool> button_down;
-
     // Init vao, vbo, ebo:
     GLuint vao_function, vbo_function, ebo_function;
     GLuint vao_isolines, vbo_isolines, ebo_isolines;
@@ -327,6 +325,10 @@ int main() try
 
     // Event loop:
     bool running = true;
+    int isolineNumber = 1;
+    bool buttonClickChecked = false;
+    std::map<SDL_Keycode, bool> button_down;
+
     while (running)
     {
         for (SDL_Event event; SDL_PollEvent(&event);) switch (event.type)
@@ -354,6 +356,20 @@ int main() try
         if (!running)
             break;
 
+        if (button_down[SDLK_UP]) {
+            if (!buttonClickChecked)
+                isolineNumber++;
+            
+            buttonClickChecked = true;
+        } else if (button_down[SDLK_DOWN]) {
+            if (!buttonClickChecked)
+                isolineNumber = std::max(isolineNumber - 1, 1);
+            
+                buttonClickChecked = true;
+        } else {
+            buttonClickChecked = false;
+        }
+
         auto now = std::chrono::high_resolution_clock::now();
         float dt = std::chrono::duration_cast<std::chrono::duration<float>>(now - last_frame_start).count();
         last_frame_start = now;
@@ -371,7 +387,12 @@ int main() try
 
         isolinePointsMap = {};
         isolineIndices = {};
-        fillIsolinePoints(time, 0.75f);
+
+        for (int i = 0; i < isolineNumber; i++) {
+            float v = ISOLINES_MIN + (ISOLINES_MAX - ISOLINES_MIN) / (isolineNumber + 1) * (i + 1);
+            fillIsolinePoints(time, v);
+        }
+
         std::vector<point> isolinePoints = std::vector<point>(isolinePointsMap.size());
         
         for (auto val : isolinePointsMap) {
