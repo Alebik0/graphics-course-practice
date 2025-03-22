@@ -226,19 +226,7 @@ int main() try
 
     std::default_random_engine rng;
 
-    std::vector<particle> particles(256);
-    for (auto & p : particles)
-    {
-        p.position.x = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
-        p.position.y = 0.f;
-        p.position.z = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
-        p.size = std::uniform_real_distribution<float>{0.1f, 0.2f}(rng);
-        p.velocity.x = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
-        p.velocity.y = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
-        p.velocity.z = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
-        p.angle = 0;
-        p.angle_velocity = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
-    }
+    std::vector<particle> particles;
 
     GLuint vao, vbo;
     glGenVertexArrays(1, &vao);
@@ -336,6 +324,34 @@ int main() try
         glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
 
         if (!paused) {
+            if (particles.size() < 256) {
+                particle p;
+                p.position.x = std::uniform_real_distribution<float>{-0.5f, 0.5f}(rng);
+                p.position.y = 0.f;
+                p.position.z = std::uniform_real_distribution<float>{-0.5f, 0.5f}(rng);
+                p.size = std::uniform_real_distribution<float>{0.1f, 0.2f}(rng);
+                p.velocity.x = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
+                p.velocity.y = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
+                p.velocity.z = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
+                p.angle = 0;
+                p.angle_velocity = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
+                particles.push_back(p);
+            }
+
+            for (particle & p : particles) {
+                if (p.position.y > 1.0f || p.position.x > 0.5f || p.position.z > 0.5f) {
+                    p.position.x = std::uniform_real_distribution<float>{-0.5f, 0.5f}(rng);
+                    p.position.y = 0.f;
+                    p.position.z = std::uniform_real_distribution<float>{-0.5f, 0.5f}(rng);
+                    p.size = std::uniform_real_distribution<float>{0.1f, 0.2f}(rng);
+                    p.velocity.x = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
+                    p.velocity.y = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
+                    p.velocity.z = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
+                    p.angle = 0;
+                    p.angle_velocity = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
+                }
+            }
+
             const float A = 0.1f;
             const float C = 0.1f;
             const float D = 0.1f;
