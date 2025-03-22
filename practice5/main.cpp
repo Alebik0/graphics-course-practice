@@ -57,6 +57,8 @@ void main()
 const char fragment_shader_source[] =
 R"(#version 330 core
 
+uniform float time;
+
 in vec3 normal;
 in vec2 texcoord;
 
@@ -67,7 +69,8 @@ uniform sampler2D textureSampler;
 void main()
 {
     float lightness = 0.5 + 0.5 * dot(normalize(normal), normalize(vec3(1.0, 2.0, 3.0)));
-    vec3 albedo = texture(textureSampler, texcoord).rgb;
+    vec2 texcoord_offset = vec2(mod(texcoord.x + time * 0.1, 1.0), mod(texcoord.y + time * 0.0, 1.0));
+    vec3 albedo = texture(textureSampler, texcoord_offset).rgb;
     out_color = vec4(lightness * albedo, 1.0);
 }
 )";
@@ -158,6 +161,7 @@ int main() try
     GLuint viewmodel_location = glGetUniformLocation(program, "viewmodel");
     GLuint projection_location = glGetUniformLocation(program, "projection");
     GLuint textureSampler_location = glGetUniformLocation(program, "textureSampler");
+    GLuint time_location = glGetUniformLocation(program, "time");
 
     std::string project_root = PROJECT_ROOT;
     std::string cow_texture_path = project_root + "/cow.png";
@@ -319,6 +323,7 @@ int main() try
         glUniformMatrix4fv(viewmodel_location, 1, GL_TRUE, viewmodel);
         glUniformMatrix4fv(projection_location, 1, GL_TRUE, projection);
         glUniform1i(textureSampler_location, 1);
+        glUniform1f(time_location, time);
 
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, cow.indices.size(), GL_UNSIGNED_INT, (void *)(0));
