@@ -91,22 +91,22 @@ void main()
     Y = new_y;
 
     point = center + normalize(X + Y) * size[0];
-    texcoord = vec2(0.0, 0.0);
-    gl_Position = projection * view * model * vec4(point, 1.0);
-    EmitVertex();
-    
-    point = center + normalize(X - Y) * size[0];
-    texcoord = vec2(0.0, 1.0);
-    gl_Position = projection * view * model * vec4(point, 1.0);
-    EmitVertex();
-    
-    point = center + normalize(-X + Y) * size[0];
     texcoord = vec2(1.0, 1.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
     
-    point = center + normalize(-X - Y) * size[0];
+    point = center + normalize(X - Y) * size[0];
     texcoord = vec2(1.0, 0.0);
+    gl_Position = projection * view * model * vec4(point, 1.0);
+    EmitVertex();
+    
+    point = center + normalize(-X + Y) * size[0];
+    texcoord = vec2(0.0, 1.0);
+    gl_Position = projection * view * model * vec4(point, 1.0);
+    EmitVertex();
+    
+    point = center + normalize(-X - Y) * size[0];
+    texcoord = vec2(0.0, 0.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
 
@@ -120,11 +120,13 @@ R"(#version 330 core
 
 layout (location = 0) out vec4 out_color;
 
+uniform sampler2D particle_texture;
+
 in vec2 texcoord;
 
 void main()
 {
-    out_color = vec4(texcoord, 0.0, 1.0);
+    out_color = vec4(1.0, 1.0, 1.0, texture(particle_texture, texcoord).r);
 }
 )";
 
@@ -163,6 +165,24 @@ GLuint create_program(Shaders ... shaders)
         glGetProgramInfoLog(result, info_log.size(), nullptr, info_log.data());
         throw std::runtime_error("Program linkage failed: " + info_log);
     }
+
+    return result;
+}
+
+GLuint load_texture(std::string const & path)
+{
+    int width, height, channels;
+    auto pixels = stbi_load(path.data(), &width, &height, &channels, 4);
+
+    GLuint result;
+    glGenTextures(1, &result);
+    glBindTexture(GL_TEXTURE_2D, result);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    stbi_image_free(pixels);
 
     return result;
 }
@@ -223,6 +243,7 @@ int main() try
     GLuint view_location = glGetUniformLocation(program, "view");
     GLuint projection_location = glGetUniformLocation(program, "projection");
     GLuint camera_position_location = glGetUniformLocation(program, "camera_position");
+    GLuint particle_texture_location = glGetUniformLocation(program, "particle_texture");
 
     std::default_random_engine rng;
 
@@ -244,6 +265,8 @@ int main() try
 
     const std::string project_root = PROJECT_ROOT;
     const std::string particle_texture_path = project_root + "/particle.png";
+
+    GLuint particle_texture = load_texture(particle_texture_path);
 
     glPointSize(5.f);
 
@@ -307,7 +330,9 @@ int main() try
             camera_rotation += 3.f * dt;
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);  
 
         float near = 0.1f;
         float far = 100.f;
@@ -374,6 +399,9 @@ int main() try
         glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
         glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
         glUniform3fv(camera_position_location, 1, reinterpret_cast<float *>(&camera_position));
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, particle_texture);
 
         glBindVertexArray(vao);
         glDrawArrays(GL_POINTS, 0, particles.size());
