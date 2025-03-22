@@ -72,24 +72,30 @@ layout (triangle_strip, max_vertices = 4) out;
 
 in float size[];
 
+out vec2 texcoord;
+
 void main()
 {
     vec3 center = gl_in[0].gl_Position.xyz;
     vec3 point;
     
     point = center + vec3( size[0],  size[0], 0.0);
+    texcoord = vec2(0.0, 0.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
     
     point = center + vec3(-size[0],  size[0], 0.0);
+    texcoord = vec2(0.0, 1.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
     
     point = center + vec3( size[0], -size[0], 0.0);
+    texcoord = vec2(1.0, 1.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
     
     point = center + vec3(-size[0], -size[0], 0.0);
+    texcoord = vec2(1.0, 0.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
 
@@ -103,9 +109,11 @@ R"(#version 330 core
 
 layout (location = 0) out vec4 out_color;
 
+in vec2 texcoord;
+
 void main()
 {
-    out_color = vec4(1.0, 0.0, 0.0, 1.0);
+    out_color = vec4(texcoord, 0.0, 1.0);
 }
 )";
 
@@ -151,7 +159,7 @@ GLuint create_program(Shaders ... shaders)
 struct particle
 {
     glm::vec3 position;
-    float size = 0.239;
+    float size;
 };
 
 int main() try
@@ -210,6 +218,7 @@ int main() try
         p.position.x = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
         p.position.y = 0.f;
         p.position.z = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
+        p.size = (float)(rand()) / (float)(RAND_MAX) * 0.1 + 0.1;
     }
 
     GLuint vao, vbo;
