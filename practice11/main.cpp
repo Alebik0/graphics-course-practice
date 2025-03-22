@@ -48,10 +48,14 @@ const char vertex_shader_source[] =
 R"(#version 330 core
 
 layout (location = 0) in vec3 in_position;
+layout (location = 1) in float in_size;
+
+out float size;
 
 void main()
 {
     gl_Position = vec4(in_position, 1.0);
+    size = in_size;
 }
 )";
 
@@ -64,13 +68,31 @@ uniform mat4 projection;
 uniform vec3 camera_position;
 
 layout (points) in;
-layout (points, max_vertices = 1) out;
+layout (triangle_strip, max_vertices = 4) out;
+
+in float size[];
 
 void main()
 {
     vec3 center = gl_in[0].gl_Position.xyz;
-    gl_Position = projection * view * model * vec4(center, 1.0);
+    vec3 point;
+    
+    point = center + vec3( size[0],  size[0], 0.0);
+    gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
+    
+    point = center + vec3(-size[0],  size[0], 0.0);
+    gl_Position = projection * view * model * vec4(point, 1.0);
+    EmitVertex();
+    
+    point = center + vec3( size[0], -size[0], 0.0);
+    gl_Position = projection * view * model * vec4(point, 1.0);
+    EmitVertex();
+    
+    point = center + vec3(-size[0], -size[0], 0.0);
+    gl_Position = projection * view * model * vec4(point, 1.0);
+    EmitVertex();
+
     EndPrimitive();
 }
 
@@ -129,6 +151,7 @@ GLuint create_program(Shaders ... shaders)
 struct particle
 {
     glm::vec3 position;
+    float size = 0.239;
 };
 
 int main() try
@@ -198,6 +221,8 @@ int main() try
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(particle), (void*)(0));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(particle), (void*)(12));
 
     const std::string project_root = PROJECT_ROOT;
     const std::string particle_texture_path = project_root + "/particle.png";
