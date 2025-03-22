@@ -37,11 +37,13 @@ layout (location = 0) in vec2 in_position;
 layout (location = 1) in vec4 in_color;
 
 out vec4 color;
+out vec2 position;
 
 void main()
 {
     gl_Position = view * vec4(in_position, 0.0, 1.0);
     color = in_color;
+    position = in_position;
 }
 )";
 
@@ -49,12 +51,24 @@ const char fragment_shader_source[] =
 R"(#version 330 core
 
 in vec4 color;
+in vec2 position;
 
 layout (location = 0) out vec4 out_color;
 
+uniform float dash;
+
 void main()
 {
-    out_color = color;
+    if (dash > 0.5) {
+        float distance = abs(position.x) + abs(position.y);
+        if (mod(distance, 40.0) < 20.0) {
+            discard;
+        }
+
+        out_color = color;
+    } else {
+        out_color = color;
+    }
 }
 )";
 
@@ -190,6 +204,7 @@ int main() try
     auto program = create_program(vertex_shader, fragment_shader);
 
     GLuint view_location = glGetUniformLocation(program, "view");
+    GLuint dash_location = glGetUniformLocation(program, "dash");
 
     int quality = 4;
     std::vector<vertex> path_vertexes = {};
@@ -298,6 +313,7 @@ int main() try
 
         glUseProgram(program);
         glUniformMatrix4fv(view_location, 1, GL_TRUE, view);
+        glUniform1f(dash_location, 0.f);
         
         glBindVertexArray(vao_path);
         glLineWidth(5.f);
@@ -305,6 +321,7 @@ int main() try
         glDrawArrays(GL_POINTS, 0, path_vertexes.size());
         glDrawArrays(GL_LINE_STRIP, 0, path_vertexes.size());
 
+        glUniform1f(dash_location, 1.f);
         glBindVertexArray(vao_bezier);
         glLineWidth(2.5f);
         glPointSize(2.5f);
