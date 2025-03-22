@@ -49,13 +49,16 @@ R"(#version 330 core
 
 layout (location = 0) in vec3 in_position;
 layout (location = 1) in float in_size;
+layout (location = 2) in float in_angle;
 
 out float size;
+out float angle;
 
 void main()
 {
     gl_Position = vec4(in_position, 1.0);
     size = in_size;
+    angle = in_angle;
 }
 )";
 
@@ -71,6 +74,7 @@ layout (points) in;
 layout (triangle_strip, max_vertices = 4) out;
 
 in float size[];
+in float angle[];
 
 out vec2 texcoord;
 
@@ -81,7 +85,11 @@ void main()
     vec3 Z = normalize(camera_position - center);
     vec3 X = normalize(cross(Z, vec3(0.f, 1.f, 0.f)));
     vec3 Y = cross(X, Z);
-    
+    vec3 new_x = X * cos(angle[0]) + Y * sin(angle[0]);
+    vec3 new_y = X * sin(angle[0]) - Y * cos(angle[0]);
+    X = new_x;
+    Y = new_y;
+
     point = center + normalize(X + Y) * size[0];
     texcoord = vec2(0.0, 0.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
@@ -164,6 +172,8 @@ struct particle
     glm::vec3 position;
     float size;
     glm::vec3 velocity;
+    float angle;
+    float angle_velocity;
 };
 
 int main() try
@@ -223,9 +233,11 @@ int main() try
         p.position.y = 0.f;
         p.position.z = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
         p.size = std::uniform_real_distribution<float>{0.1f, 0.2f}(rng);
-        p.velocity.x = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
-        p.velocity.y = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
-        p.velocity.z = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
+        p.velocity.x = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
+        p.velocity.y = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
+        p.velocity.z = std::uniform_real_distribution<float>{-0.2f, 0.2f}(rng);
+        p.angle = 0;
+        p.angle_velocity = std::uniform_real_distribution<float>{-1.f, 1.f}(rng);
     }
 
     GLuint vao, vbo;
@@ -239,6 +251,8 @@ int main() try
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(particle), (void*)(0));
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(particle), (void*)(12));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(particle), (void*)(28));
 
     const std::string project_root = PROJECT_ROOT;
     const std::string particle_texture_path = project_root + "/particle.png";
@@ -322,7 +336,7 @@ int main() try
         glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
 
         if (!paused) {
-            const float A = 1.f;
+            const float A = 0.1f;
             const float C = 0.1f;
             const float D = 0.1f;
 
@@ -331,6 +345,7 @@ int main() try
                 particle.position += dt * particle.velocity;
                 particle.velocity *= exp(- C * dt);
                 particle.size *= exp(- D * dt);
+                particle.angle += particle.angle_velocity * dt;
             }
         }
 
