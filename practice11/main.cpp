@@ -78,23 +78,26 @@ void main()
 {
     vec3 center = gl_in[0].gl_Position.xyz;
     vec3 point;
+    vec3 Z = normalize(camera_position - center);
+    vec3 X = normalize(cross(Z, vec3(0.f, 1.f, 0.f)));
+    vec3 Y = cross(X, Z);
     
-    point = center + vec3( size[0],  size[0], 0.0);
+    point = center + normalize(X + Y) * size[0];
     texcoord = vec2(0.0, 0.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
     
-    point = center + vec3(-size[0],  size[0], 0.0);
+    point = center + normalize(X - Y) * size[0];
     texcoord = vec2(0.0, 1.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
     
-    point = center + vec3( size[0], -size[0], 0.0);
+    point = center + normalize(-X + Y) * size[0];
     texcoord = vec2(1.0, 1.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
     
-    point = center + vec3(-size[0], -size[0], 0.0);
+    point = center + normalize(-X - Y) * size[0];
     texcoord = vec2(1.0, 0.0);
     gl_Position = projection * view * model * vec4(point, 1.0);
     EmitVertex();
