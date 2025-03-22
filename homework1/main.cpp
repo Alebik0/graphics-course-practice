@@ -38,7 +38,7 @@ struct std::hash<point_ref>
   }
 };
 
-std::array<point, (W + 1) * (H + 1)> points;
+std::vector<point> points((W + 1) * (H + 1));
 std::vector<std::uint32_t> indices;
 std::unordered_map<point_ref, indexed_point> isolinePointsMap;
 std::vector<std::uint32_t> isolineIndices;
@@ -97,8 +97,8 @@ GLuint create_program(GLuint vertex_shader, GLuint fragment_shader)
     return result;
 }
 
-std::array<point, (W + 1) * (H + 1)> makeTable(const float time) {
-    std::array<point, (W + 1) * (H + 1)> points;
+std::vector<point> makeTable(const float time) {
+    std::vector<point> points((W + 1) * (H + 1));
     
     for (int row = 0; row <= H; row++) {
         for (int column = 0; column <= W; column++) {
@@ -357,15 +357,35 @@ int main() try
             break;
 
         if (button_down[SDLK_UP]) {
-            if (!buttonClickChecked)
+            if (!buttonClickChecked) {
                 isolineNumber++;
+                std::cout << "Isolines: " << isolineNumber << std::endl;
+            }
             
             buttonClickChecked = true;
         } else if (button_down[SDLK_DOWN]) {
-            if (!buttonClickChecked)
+            if (!buttonClickChecked) {
                 isolineNumber = std::max(isolineNumber - 1, 1);
+                std::cout << "Isolines: " << isolineNumber << std::endl;
+            }
             
-                buttonClickChecked = true;
+            buttonClickChecked = true;
+        } else if (button_down[SDLK_RIGHT]) {
+            if (!buttonClickChecked) {
+                W += DETALISATION_STEP;
+                H += DETALISATION_STEP;
+                std::cout << "W: " << W << ", H: " << H << std::endl;
+            }
+            
+            buttonClickChecked = true;
+        } else if (button_down[SDLK_DOWN]) {
+            if (!buttonClickChecked) {
+                W = std::max(W - DETALISATION_STEP, DETALISATION_STEP);
+                H = std::max(H - DETALISATION_STEP, DETALISATION_STEP);
+                std::cout << "W: " << W << ", H: " << H << std::endl;
+            }
+            
+            buttonClickChecked = true;
         } else {
             buttonClickChecked = false;
         }

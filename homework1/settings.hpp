@@ -2,8 +2,9 @@
 #include <cmath>
 
 // Project settings:
-const int W = 100;
-const int H = 100;
+const int DETALISATION_STEP = 2;
+int W = DETALISATION_STEP;
+int H = DETALISATION_STEP;
 const float X_MIN = 0.f;
 const float Y_MIN = 0.f;
 const float X_MAX = 1.f;
