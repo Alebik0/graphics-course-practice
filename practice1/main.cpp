@@ -17,9 +17,20 @@ R"(#version 330 core
 layout (location = 0) out vec4 out_color;
 
 in vec3 color;
+in vec2 position;
+
 void main()
 {
-    out_color = vec4(color, 1.0);
+    float timed_x = position.x * 10;
+    float timed_y = position.y * 10;
+
+    if (timed_x - floor(timed_x) < 0.5 && timed_y  - floor(timed_y) < 0.5) {
+        out_color = vec4(0.0, 0.0, 0.0, 1.0);
+    } else if (timed_x - floor(timed_x) > 0.5 && timed_y - floor(timed_y) > 0.5) {
+        out_color = vec4(0.0, 0.0, 0.0, 1.0);
+    } else {
+        out_color = vec4(1.0, 1.0, 1.0, 1.0);
+    }
 }
 )";
 
@@ -33,6 +44,7 @@ vec2(0.0, 1.0)
 );
 
 out vec3 color;
+out vec2 position;
 
 void main()
 {
@@ -42,6 +54,7 @@ void main()
         gl_VertexID * (gl_VertexID - 1) * 0.5,
         0.0
     );
+    position = VERTICES[gl_VertexID];
 }
 )";
 
