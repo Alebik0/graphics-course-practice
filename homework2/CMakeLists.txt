@@ -29,9 +29,8 @@ set(PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 include_directories("shaders/")
 add_executable(${TARGET_NAME} 
 	main.cpp 
-	obj_parser.hpp 
-	camera.hpp settings.hpp light.hpp
-	source_shaders.hpp debug_shaders.hpp shadowmap_shaders.hpp 
+	data.hpp
+	shaders.hpp
 	scene_init.hpp scene_init.cpp
 	tiny_obj_loader.h 
 	stb_image.h)

@@ -26,7 +26,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include "obj_parser.hpp"
+#include "data.hpp"
 #include "scene_init.hpp"
 
 std::vector<std::vector<obj_data::vertex>> group_verticies_by_material(

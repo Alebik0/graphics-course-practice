@@ -27,15 +27,10 @@
 #include <glm/ext/scalar_constants.hpp>
 #include <glm/gtx/string_cast.hpp>
 
-#include "obj_parser.hpp"
+#include "data.hpp"
 #include "globals.hpp"
 #include "scene_init.hpp"
-#include "camera.hpp"
-#include "settings.hpp"
-#include "light.hpp"
-#include "source_shaders.hpp"
-#include "shadowmap_shaders.hpp"
-#include "debug_shaders.hpp"
+#include "shaders.hpp"
 
 std::string to_string(std::string_view str)
 {
