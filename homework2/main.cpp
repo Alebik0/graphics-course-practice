@@ -29,13 +29,13 @@
 
 #include "obj_parser.hpp"
 #include "globals.hpp"
-#include "gl_init.hpp"
 #include "scene_init.hpp"
 #include "camera.hpp"
 #include "settings.hpp"
 #include "light.hpp"
 #include "source_shaders.hpp"
 #include "shadowmap_shaders.hpp"
+#include "debug_shaders.hpp"
 
 std::string to_string(std::string_view str)
 {
@@ -125,7 +125,6 @@ int main() try
     std::string scene_path = project_root + "/data/sponza/sponza.obj";
     std::string scene_dir = project_root + "/data/sponza/";
     obj_data scene = load_scene(scene_path, scene_dir);
-    gl_data scene_gl_data = init_gl(settings.width, settings.height, scene);
 
     float time = 0.f;
     bool paused = false;
@@ -136,6 +135,7 @@ int main() try
     Camera camera = Camera();
     SourceShader sourceShader = SourceShader();
     ShadowmapShader shadowmapShader = ShadowmapShader();
+    DebugShader debugShader = DebugShader();
     sourceShader.UpdateBufferData(scene);
 
     bool running = true;
@@ -215,16 +215,8 @@ int main() try
         }
 
         { // Draw debug
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-            glDisable(GL_DEPTH_TEST);
-
-            glUseProgram(scene_gl_data.debug_program);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, shadowmapShader.shadowmapTexture);
-            glUniform1i(scene_gl_data.debug__shadowmap_texture, 0);
-
-            glBindVertexArray(scene_gl_data.debug_vao);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            debugShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
+            debugShader.Draw();
         }
         
 
