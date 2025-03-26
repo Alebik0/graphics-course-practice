@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(practice9)
+project(homework2)
 
 cmake_policy(SET CMP0072 NEW)
 cmake_policy(SET CMP0074 NEW)
