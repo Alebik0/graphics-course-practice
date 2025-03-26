@@ -66,42 +66,12 @@ gl_data init_gl(
     result.debug_fragment_shader = create_shader(GL_FRAGMENT_SHADER, debug_fragment_shader);
     result.debug_program = create_program(result.debug_vertex_shader, result.debug_fragment_shader);
 
-    result.shadowmap_vertex_shader = create_shader(GL_VERTEX_SHADER, shadowmap_vertex_shader);
-    result.shadowmap_fragment_shader = create_shader(GL_FRAGMENT_SHADER, shadowmap_fragment_shader);
-    result.shadowmap_program = create_program(result.shadowmap_vertex_shader, result.shadowmap_fragment_shader);
-
     // Make uniform locations:
     result.debug__shadowmap_texture = glGetUniformLocation(result.debug_program, "shadowmapTexture");
-
-    result.shadowmap__model = glGetUniformLocation(result.shadowmap_program, "model");
-    result.shadowmap__projection = glGetUniformLocation(result.shadowmap_program, "projection");
 
     // Make vertex arrays:
     glGenVertexArrays(1, &result.debug_vao);
     glBindVertexArray(result.debug_vao);
-
-    // Make textures:
-    glGenTextures(1, &result.shadow_map);
-    glBindTexture(GL_TEXTURE_2D, result.shadow_map);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-
-    // Make framebuffers:
-    glGenRenderbuffers(1, &result.shadow_rbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, result.shadow_rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION);
-
-    glGenFramebuffers(1, &result.shadow_fbo);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, result.shadow_fbo);
-    glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, result.shadow_map, 0);
-
-    if (glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        throw std::runtime_error("Incomplete framebuffer!");
 
     return result;
 }

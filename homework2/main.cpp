@@ -35,7 +35,7 @@
 #include "settings.hpp"
 #include "light.hpp"
 #include "source_shaders.hpp"
-
+#include "shadowmap_shaders.hpp"
 
 std::string to_string(std::string_view str)
 {
@@ -135,6 +135,7 @@ int main() try
 
     Camera camera = Camera();
     SourceShader sourceShader = SourceShader();
+    ShadowmapShader shadowmapShader = ShadowmapShader();
     sourceShader.UpdateBufferData(scene);
 
     bool running = true;
@@ -188,28 +189,9 @@ int main() try
         glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun_direction);
 
         { // Draw shadowmap
-            glm::mat4 model(1.f);
-
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, scene_gl_data.shadow_fbo);
-            glViewport(0, 0, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION);
-            glClear(GL_DEPTH_BUFFER_BIT);
-
-            glEnable(GL_DEPTH_TEST);
-            glEnable(GL_CULL_FACE);
-            glCullFace(GL_FRONT);
-
-            glUseProgram(scene_gl_data.shadowmap_program);
-
-            glUniformMatrix4fv(scene_gl_data.shadowmap__model, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-            glUniformMatrix4fv(scene_gl_data.shadowmap__projection, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
-
-            { // Draw full scene
-                glBindVertexArray(sourceShader.vao);
-
-                for (obj_data::face_data face : scene.faces) {
-                    glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
-                }
-            }
+            shadowmapShader.model = glm::mat4(1.f);
+            shadowmapShader.projection = shadowmap_projection;
+            shadowmapShader.Draw(sourceShader, scene);
         }
 
         { // Draw source
@@ -225,9 +207,9 @@ int main() try
             sourceShader.view = view;
             sourceShader.projection = projection;
             sourceShader.ambient_light = AMBIENT_COLOR;
-            sourceShader.sun = { SUN_DIRECTION, SUN_COLOR };
+            sourceShader.sun = { sun_direction, SUN_COLOR };
             sourceShader.light = { LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.3f), LIGHT_COLOR, LIGHT_ATTENUATION };
-            sourceShader.shadowmapTexture = scene_gl_data.shadow_map;
+            sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
             sourceShader.shadowmap_projection = shadowmap_projection;
             sourceShader.Draw(settings, camera, scene);
         }
@@ -238,7 +220,7 @@ int main() try
 
             glUseProgram(scene_gl_data.debug_program);
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, scene_gl_data.shadow_map);
+            glBindTexture(GL_TEXTURE_2D, shadowmapShader.shadowmapTexture);
             glUniform1i(scene_gl_data.debug__shadowmap_texture, 0);
 
             glBindVertexArray(scene_gl_data.debug_vao);
