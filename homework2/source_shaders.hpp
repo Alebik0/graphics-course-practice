@@ -54,7 +54,7 @@ uniform sampler2D albedoTexture;
 uniform sampler2D alphaTexture;
 uniform float hasAlphaTexture;
 
-uniform sampler2D shadowmapTexture;
+uniform sampler2DShadow shadowmapTexture;
 uniform mat4 shadowmap_projection;
 
 in vec3 position;
@@ -86,30 +86,21 @@ void main()
     color += ambient_color;
 
     vec3 sun_color = diffuse(sun_direction) * sun_color;
-    vec4 shadow_pos = shadowmap_projection * vec4(position, 1.0);
-    shadow_pos /= shadow_pos.w;
-    shadow_pos = shadow_pos * 0.5 + vec4(0.5);
+    
+    vec4 ndc = shadowmap_projection * vec4(position, 1.0);
+ 
+    if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
+        vec3 shadowmap_texcoord = ndc.xyz * 0.5 + 0.5;
+        float shadow_depth = ndc.z * 0.5 + 0.5;
 
-    vec2 sum = vec2(0.0);
-    vec2 sum_w = vec2(0.0);
-    const int N = 5;
-    float radius = 100.0;
-    for (int x = -N; x <= N; ++x) {
-        for (int y = -N; y <= N; ++y) {
-            float c = exp(-float(x * x + y * y) / (radius*radius));
-            sum += c * texture(shadowmapTexture, shadow_pos.xy + vec2(x,y) / vec2(textureSize(shadowmapTexture, 0))).rg;
-            sum_w += c;
+        if (texture(shadowmapTexture, shadowmap_texcoord) < 0.5) {
+        } else {
+            color += sun_color;
         }
-    }
-    vec2 data = sum / sum_w;
-    float mu = data.r;
-    float sigma = data.g - mu * mu;
-    float z = shadow_pos.z - 0.01;
-    float factor = (z < mu) ? 1.0 : sigma / (sigma + (z - mu) * (z - mu));
-    float delta = 0.125;
-    float shadow_factor = factor < delta ? 0.0 : (factor - delta) / (1 - delta);
-    color += sun_color * shadow_factor;
-
+    } else {
+        color += sun_color;
+    }    
+ 
     float distance = length(point_light_position - position);
     float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
     float light_attenuation = 1.0 / divider;
