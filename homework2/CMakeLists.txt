@@ -30,10 +30,10 @@ include_directories("shaders/")
 add_executable(${TARGET_NAME} 
 	main.cpp 
 	obj_parser.hpp 
+	camera.hpp settings.hpp light.hpp
 	source_shaders.hpp debug_shaders.hpp shadowmap_shaders.hpp 
 	gl_init.hpp gl_init.cpp
 	scene_init.hpp scene_init.cpp
-	draw.hpp draw.cpp
 	tiny_obj_loader.h 
 	stb_image.h)
 target_include_directories(${TARGET_NAME} PUBLIC

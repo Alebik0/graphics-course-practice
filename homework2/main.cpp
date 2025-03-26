@@ -31,7 +31,10 @@
 #include "globals.hpp"
 #include "gl_init.hpp"
 #include "scene_init.hpp"
-#include "draw.hpp"
+#include "camera.hpp"
+#include "settings.hpp"
+#include "light.hpp"
+#include "source_shaders.hpp"
 
 
 std::string to_string(std::string_view str)
@@ -105,8 +108,8 @@ int main() try
     if (!window)
         sdl2_fail("SDL_CreateWindow: ");
 
-    int width, height;
-    SDL_GetWindowSize(window, &width, &height);
+    Settings settings = Settings();
+    SDL_GetWindowSize(window, &settings.width, &settings.height);
 
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     if (!gl_context)
@@ -122,7 +125,7 @@ int main() try
     std::string scene_path = project_root + "/data/sponza/sponza.obj";
     std::string scene_dir = project_root + "/data/sponza/";
     obj_data scene = load_scene(scene_path, scene_dir);
-    gl_data scene_gl_data = init_gl(width, height, scene);
+    gl_data scene_gl_data = init_gl(settings.width, settings.height, scene);
 
     float time = 0.f;
     bool paused = false;
@@ -130,10 +133,9 @@ int main() try
     
     std::map<SDL_Keycode, bool> button_down;
 
-    glm::vec3 camera_position = INITIAL_CAMERA_POSITION;
-    float camera_angle = glm::pi<float>() / 2;
-    float near = 0.1f;
-    float far = 10000.f;
+    Camera camera = Camera();
+    SourceShader sourceShader = SourceShader();
+    sourceShader.UpdateBufferData(scene);
 
     bool running = true;
     while (running)
@@ -146,9 +148,8 @@ int main() try
         case SDL_WINDOWEVENT: switch (event.window.event)
             {
             case SDL_WINDOWEVENT_RESIZED:
-                width = event.window.data1;
-                height = event.window.data2;
-                glViewport(0, 0, width, height);
+                settings.width = event.window.data1;
+                settings.height = event.window.data2;
                 break;
             }
             break;
@@ -169,46 +170,80 @@ int main() try
             last_frame_start = now;
             time += dt;
 
-            bool position_changed = false;
-
             if (button_down[SDLK_w]) {
-                camera_position += UP * dt * CAMERA_SPEED;
-                position_changed = true;
+                camera.MoveForward(dt);
             }
             if (button_down[SDLK_s]) {
-                camera_position -= UP * dt * CAMERA_SPEED;
-                position_changed;
+                camera.MoveBackward(dt);
             }
-            if (button_down[SDLK_UP]) {
-                camera_position += (- FWD * std::cos(camera_angle) + RGH * std::sin(camera_angle)) * CAMERA_SPEED * dt;
-                position_changed = true;
+            if (button_down[SDLK_LEFT]) {
+                camera.RotateLeft(dt);
             }
-            if (button_down[SDLK_DOWN]) {
-                camera_position -= (- FWD * std::cos(camera_angle) + RGH * std::sin(camera_angle)) * CAMERA_SPEED * dt;
-                position_changed = true;
-            }
-            
-            if (button_down[SDLK_d])
-                camera_angle += CAMERA_ROTATION_SPEED * dt;
-            if (button_down[SDLK_a])
-                camera_angle -= CAMERA_ROTATION_SPEED * dt;
-
-            if (position_changed) {
-                std::cout << "Position changed: " 
-                    << camera_position.x << ' ' 
-                    << camera_position.y << ' ' 
-                    << camera_position.z << ' '
-                    << "( Angle: " << camera_angle << " )"
-                    << std::endl;
+            if (button_down[SDLK_RIGHT]) {
+                camera.RotateRight(dt);
             }
         }
 
         glm::vec3 sun_direction = UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f);
         glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun_direction);
 
-        draw_shadowmap(scene, scene_gl_data, shadowmap_projection);
-        draw_scene(scene, scene_gl_data, camera_position, camera_angle, width, height, near, far, time, shadowmap_projection);
-        draw_debug(scene, scene_gl_data);
+        { // Draw shadowmap
+            glm::mat4 model(1.f);
+
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, scene_gl_data.shadow_fbo);
+            glViewport(0, 0, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION);
+            glClear(GL_DEPTH_BUFFER_BIT);
+
+            glEnable(GL_DEPTH_TEST);
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+
+            glUseProgram(scene_gl_data.shadowmap_program);
+
+            glUniformMatrix4fv(scene_gl_data.shadowmap__model, 1, GL_FALSE, reinterpret_cast<float *>(&model));
+            glUniformMatrix4fv(scene_gl_data.shadowmap__projection, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
+
+            { // Draw full scene
+                glBindVertexArray(sourceShader.vao);
+
+                for (obj_data::face_data face : scene.faces) {
+                    glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
+                }
+            }
+        }
+
+        { // Draw source
+            glm::mat4 model(1.f);
+
+            glm::mat4 view(1.f);
+            view = glm::rotate(view, camera.angle, UP);
+            view = glm::translate(view, -camera.position);
+
+            glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, (1.f * settings.width) / settings.height, settings.near, settings.far);
+
+            sourceShader.model = model;
+            sourceShader.view = view;
+            sourceShader.projection = projection;
+            sourceShader.ambient_light = AMBIENT_COLOR;
+            sourceShader.sun = { SUN_DIRECTION, SUN_COLOR };
+            sourceShader.light = { LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.3f), LIGHT_COLOR, LIGHT_ATTENUATION };
+            sourceShader.shadowmapTexture = scene_gl_data.shadow_map;
+            sourceShader.shadowmap_projection = shadowmap_projection;
+            sourceShader.Draw(settings, camera, scene);
+        }
+
+        { // Draw debug
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            glDisable(GL_DEPTH_TEST);
+
+            glUseProgram(scene_gl_data.debug_program);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, scene_gl_data.shadow_map);
+            glUniform1i(scene_gl_data.debug__shadowmap_texture, 0);
+
+            glBindVertexArray(scene_gl_data.debug_vao);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
         
 
         SDL_GL_SwapWindow(window);
