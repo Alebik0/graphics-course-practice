@@ -40,7 +40,7 @@ public:
         up_direction = glm::vec3(0.f, 1.f, 0.f);
 
         position = glm::vec3(1000.f, 125.f, 0.f);
-        angle = 0.f;
+        angle = glm::pi<float>();
     }
 
     void MoveForward(const float dt) {

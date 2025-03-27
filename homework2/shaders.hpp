@@ -90,6 +90,13 @@ vec3 diffuse(vec3 direction)
     return albedo * max(0.0, dot(normal, direction));
 }
 
+
+float LinearizeDepth(float depth)
+{
+    float z = depth * 2.0 - 1.0; // Back to NDC 
+    return (2.0 * 0.1 * 1000.0) / (1000.0 + 0.1 - z * (1000.0 - 0.1));
+}
+
 void main()
 {
     if (hasAlphaTexture > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
@@ -127,17 +134,15 @@ void main()
     
     { // Add light color
         vec4 ndc = light_shadowmap_projection * vec4(position, 1.0);
-        float shadow_depth = length(ndc) / 1000.f;
+        float shadow_depth = abs(ndc.z);
         vec2 shadowmap_texcoord = ndc.xy / abs(ndc.z);
         
         if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
             shadowmap_texcoord = shadowmap_texcoord.xy * 0.5 + 0.5;
 
-            if (texture(lightShadowmapTexture, shadowmap_texcoord).r + 0.05 > shadow_depth) {
+            if (LinearizeDepth(texture(lightShadowmapTexture, shadowmap_texcoord).r) > shadow_depth) {
                 color += light_color;
             }
-        } else {
-            color += light_color;
         }
     }
 
@@ -477,36 +482,19 @@ R"(#version 330 core
 
 layout (location = 0) in vec3 in_position;
 
-out vec3 position;
-
 uniform mat4 projection;
 
 void main()
 {
-    vec4 pos = projection * vec4(in_position, 1.0);
-    position = pos.xyz;
-    gl_Position = pos;
+    gl_Position = projection * vec4(in_position, 1.0);
 }
 )";
     
     static inline char shadowmap_fragment_shader[] =
 R"(#version 330 core
 
-in vec3 position;
-
-uniform vec3 lightPos;
-uniform float far;
-uniform float near;
-
 void main()
 {
-    float lightDistance = length(position);
-    
-    // map to [0;1] range by dividing by far
-    lightDistance = lightDistance / far;
-    
-    // write this as modified depth
-    gl_FragDepth = lightDistance;
 }
 )";
 
@@ -662,9 +650,15 @@ in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
+float LinearizeDepth(float depth)
+{
+    float z = depth * 2.0 - 1.0; // Back to NDC 
+    return (2.0 * 0.1 * 1000.0) / (1000.0 + 0.1 - z * (1000.0 - 0.1));
+}
+
 void main()
 {
-    out_color = vec4(texture(shadowmapTexture, texcoord).r, texture(shadowmapTexture, texcoord).r, texture(shadowmapTexture, texcoord).r, 1.0);
+    out_color = vec4(vec3(LinearizeDepth(texture(shadowmapTexture, texcoord).r)) / 1000.0, 1.0);
 }
 )";
 
