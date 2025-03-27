@@ -70,7 +70,7 @@ uniform float hasAlphaTexture;
 uniform sampler2D shadowmapTexture;
 uniform mat4 shadowmap_projection;
 
-uniform sampler2D lightShadowmapTexture;
+uniform sampler2DShadow lightShadowmapTexture;
 uniform mat4 light_shadowmap_projection;
 
 in vec3 position;
@@ -134,13 +134,12 @@ void main()
     
     { // Add light color
         vec4 ndc = light_shadowmap_projection * vec4(position, 1.0);
-        float shadow_depth = abs(ndc.z);
-        vec2 shadowmap_texcoord = ndc.xy / abs(ndc.z);
+        vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
         
         if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
-            shadowmap_texcoord = shadowmap_texcoord.xy * 0.5 + 0.5;
-
-            if (LinearizeDepth(texture(lightShadowmapTexture, shadowmap_texcoord).r) > shadow_depth) {
+            shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
+    
+            if (texture(lightShadowmapTexture, shadowmap_texcoord) > 0.5) {
                 color += light_color;
             }
         }
@@ -568,11 +567,12 @@ public:
         // Make textures:
         glGenTextures(1, &shadowmapTexture);
         glBindTexture(GL_TEXTURE_2D, shadowmapTexture);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE); 
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 
         // Make framebuffers:
