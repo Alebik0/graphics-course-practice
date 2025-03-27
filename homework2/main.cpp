@@ -244,18 +244,12 @@ int main() try
             sourceShader.light = light;
             sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
             sourceShader.shadowmap_projection = shadowmap_projection;
-            sourceShader.lightShadowmapTexture0 = lightShadowmap[0].shadowmapTexture;
-            sourceShader.lightShadowmapTexture1 = lightShadowmap[1].shadowmapTexture;
-            sourceShader.lightShadowmapTexture2 = lightShadowmap[2].shadowmapTexture;
-            sourceShader.lightShadowmapTexture3 = lightShadowmap[3].shadowmapTexture;
-            sourceShader.lightShadowmapTexture4 = lightShadowmap[4].shadowmapTexture;
-            sourceShader.lightShadowmapTexture5 = lightShadowmap[5].shadowmapTexture;
-            sourceShader.light_shadowmap_projection0 = projections[0];
-            sourceShader.light_shadowmap_projection1 = projections[1];
-            sourceShader.light_shadowmap_projection2 = projections[2];
-            sourceShader.light_shadowmap_projection3 = projections[3];
-            sourceShader.light_shadowmap_projection4 = projections[4];
-            sourceShader.light_shadowmap_projection5 = projections[5];
+
+            for (int i = 0; i < 6; i++) {
+                sourceShader.lightShadowmapTexture[i] = lightShadowmap[i].shadowmapTexture;
+                sourceShader.light_shadowmap_projection[i] = projections[i];
+            }
+
             sourceShader.Draw(settings, camera, scene);
         }
 
