@@ -30,6 +30,6 @@ const glm::vec3 SUN_DIRECTION = UP + RGH;
 const glm::vec3 LIGHT_COLOR(1.f, 0.0f, 1.f);
 const glm::vec3 LIGHT_ATTENUATION(0.4f, 0.f, 0.00002f);
 const glm::vec3 INITIAL_CAMERA_POSITION(1000.f, 125.f, 0.f);
-const glm::vec3 LIGHT_POSITION(1200.f, 125.f, 0.f);
+const glm::vec3 LIGHT_POSITION(1200.f, 25.f, 0.f);
 const glm::vec3 LIGHT_DELTA(0.f, 0.f, 500.f);
 const GLsizei SHADOWMAP_RESOLUTION = 4096;

@@ -78,6 +78,7 @@ glm::mat4 make_sun_shadowmap_projection(
     shadowmap_projection = glm::inverse(shadowmap_projection);
 
     return shadowmap_projection;
+    // return glm::ortho(-max_value_y, max_value_y, -max_value_x, max_value_x, -max_value_z, max_value_z) * glm::lookAt(C, C + sun_direction, light_x);
 }
 
 int main() try
@@ -130,6 +131,7 @@ int main() try
     Camera camera = Camera();
     SourceShader sourceShader = SourceShader();
     ShadowmapShader shadowmapShader = ShadowmapShader();
+    PointShadowmapShader lightShadowmap = PointShadowmapShader();
     DebugShader debugShader = DebugShader();
     sourceShader.UpdateBufferData(scene);
 
@@ -180,13 +182,29 @@ int main() try
             }
         }
 
-        glm::vec3 sun_direction = UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f);
-        glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun_direction);
+        SunLight sun = { UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f), SUN_COLOR };
+        PointLight light = { LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.3f), LIGHT_COLOR, LIGHT_ATTENUATION };
+
+        glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun.direction);
+        glm::vec3 light_direction = glm::vec3(-1.f, 0.f, 0.f);
+        glm::mat4 light_shadowmap_projection;
+
+        {
+            light_shadowmap_projection = glm::perspective(glm::pi<float>() / 2, 1.f, 1.f, 1000.f) * glm::lookAt(light.position, light.position + light_direction, UP);
+            // light_shadowmap_projection = glm::ortho(-20.f, 20.f, -20.f, 20.f, 0.f, 500.f) * glm::lookAt(light.position, light.position + light_direction, UP);
+        }
 
         { // Draw shadowmap
-            shadowmapShader.model = glm::mat4(1.f);
             shadowmapShader.projection = shadowmap_projection;
             shadowmapShader.Draw(sourceShader, scene);
+        }
+
+        { // Draw shadowmap
+            lightShadowmap.projection = light_shadowmap_projection;
+            lightShadowmap.near = 1.f;
+            lightShadowmap.far = 1000.f;
+            lightShadowmap.pointLight = light;
+            lightShadowmap.Draw(sourceShader, scene);
         }
 
         { // Draw source
@@ -202,15 +220,17 @@ int main() try
             sourceShader.view = view;
             sourceShader.projection = projection;
             sourceShader.ambient_light = AMBIENT_COLOR;
-            sourceShader.sun = { sun_direction, SUN_COLOR };
-            sourceShader.light = { LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.3f), LIGHT_COLOR, LIGHT_ATTENUATION };
+            sourceShader.sun = sun;
+            sourceShader.light = light;
             sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
             sourceShader.shadowmap_projection = shadowmap_projection;
+            sourceShader.lightShadowmapTexture = lightShadowmap.shadowmapTexture;
+            sourceShader.light_shadowmap_projection = light_shadowmap_projection;
             sourceShader.Draw(settings, camera, scene);
         }
 
         { // Draw debug
-            debugShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
+            debugShader.shadowmapTexture = lightShadowmap.shadowmapTexture;
             debugShader.Draw();
         }
         
