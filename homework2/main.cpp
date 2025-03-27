@@ -131,7 +131,30 @@ int main() try
     Camera camera = Camera();
     SourceShader sourceShader = SourceShader();
     ShadowmapShader shadowmapShader = ShadowmapShader();
-    PointShadowmapShader lightShadowmap = PointShadowmapShader();
+    glm::vec3 lightDirection[6] = {
+        glm::vec3(-1.f,  0.f,  0.f),
+        glm::vec3( 1.f,  0.f,  0.f),
+        glm::vec3( 0.f, -1.f,  0.f),
+        glm::vec3( 0.f,  1.f,  0.f),
+        glm::vec3( 0.f,  0.f, -1.f),
+        glm::vec3( 0.f,  0.f,  1.f)
+    };
+    glm::vec3 lightUpDirection[6] = {
+        glm::vec3( 0.f,  1.f,  0.f),
+        glm::vec3( 0.f,  1.f,  0.f),
+        glm::vec3( 0.f,  0.f,  1.f),
+        glm::vec3( 0.f,  0.f,  1.f),
+        glm::vec3( 0.f,  1.f,  0.f),
+        glm::vec3( 0.f,  1.f,  0.f)
+    };
+    PointShadowmapShader lightShadowmap[6] = {
+        PointShadowmapShader(),
+        PointShadowmapShader(),
+        PointShadowmapShader(),
+        PointShadowmapShader(),
+        PointShadowmapShader(),
+        PointShadowmapShader()
+    };
     DebugShader debugShader = DebugShader();
     sourceShader.UpdateBufferData(scene);
 
@@ -183,28 +206,25 @@ int main() try
         }
 
         SunLight sun = { UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f), SUN_COLOR };
-        PointLight light = { LIGHT_POSITION + LIGHT_DELTA * std::sin(2.8f * 0.3f), LIGHT_COLOR, LIGHT_ATTENUATION };
+        PointLight light = { LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.3f), LIGHT_COLOR, LIGHT_ATTENUATION };
 
         glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun.direction);
-        glm::vec3 light_direction = glm::vec3(-1.f, 0.f, 0.f);
-        glm::mat4 light_shadowmap_projection;
 
-        {
-            light_shadowmap_projection = glm::perspective(glm::pi<float>() / 2, 1.f, 0.1f, 1000.f) * glm::lookAt(light.position, light.position + light_direction, UP);
-            // light_shadowmap_projection = glm::ortho(-20.f, 20.f, -20.f, 20.f, 0.f, 500.f) * glm::lookAt(light.position, light.position + light_direction, UP);
+        glm::mat4 projections[6];
+
+        for (int i = 0; i < 6; i++) {
+            projections[i] = glm::perspective(glm::pi<float>() / 2, 1.f, 0.1f, 1000.f) *
+                glm::lookAt(light.position, light.position + lightDirection[i], lightUpDirection[i]);
+        }
+        
+        for (int i = 0; i < 6; i++) {
+            lightShadowmap[i].projection = projections[i];
+            lightShadowmap[i].Draw(sourceShader, scene);
         }
 
         { // Draw shadowmap
             shadowmapShader.projection = shadowmap_projection;
             shadowmapShader.Draw(sourceShader, scene);
-        }
-
-        { // Draw shadowmap
-            lightShadowmap.projection = light_shadowmap_projection;
-            lightShadowmap.near = 0.1f;
-            lightShadowmap.far = 1000.f;
-            lightShadowmap.pointLight = light;
-            lightShadowmap.Draw(sourceShader, scene);
         }
 
         { // Draw source
@@ -224,13 +244,23 @@ int main() try
             sourceShader.light = light;
             sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
             sourceShader.shadowmap_projection = shadowmap_projection;
-            sourceShader.lightShadowmapTexture = lightShadowmap.shadowmapTexture;
-            sourceShader.light_shadowmap_projection = light_shadowmap_projection;
+            sourceShader.lightShadowmapTexture0 = lightShadowmap[0].shadowmapTexture;
+            sourceShader.lightShadowmapTexture1 = lightShadowmap[1].shadowmapTexture;
+            sourceShader.lightShadowmapTexture2 = lightShadowmap[2].shadowmapTexture;
+            sourceShader.lightShadowmapTexture3 = lightShadowmap[3].shadowmapTexture;
+            sourceShader.lightShadowmapTexture4 = lightShadowmap[4].shadowmapTexture;
+            sourceShader.lightShadowmapTexture5 = lightShadowmap[5].shadowmapTexture;
+            sourceShader.light_shadowmap_projection0 = projections[0];
+            sourceShader.light_shadowmap_projection1 = projections[1];
+            sourceShader.light_shadowmap_projection2 = projections[2];
+            sourceShader.light_shadowmap_projection3 = projections[3];
+            sourceShader.light_shadowmap_projection4 = projections[4];
+            sourceShader.light_shadowmap_projection5 = projections[5];
             sourceShader.Draw(settings, camera, scene);
         }
 
         { // Draw debug
-            debugShader.shadowmapTexture = lightShadowmap.shadowmapTexture;
+            debugShader.shadowmapTexture = lightShadowmap[2].shadowmapTexture;
             debugShader.Draw();
         }
         

@@ -70,8 +70,18 @@ uniform float hasAlphaTexture;
 uniform sampler2D shadowmapTexture;
 uniform mat4 shadowmap_projection;
 
-uniform sampler2DShadow lightShadowmapTexture;
-uniform mat4 light_shadowmap_projection;
+uniform sampler2DShadow lightShadowmapTexture0;
+uniform sampler2DShadow lightShadowmapTexture1;
+uniform sampler2DShadow lightShadowmapTexture2;
+uniform sampler2DShadow lightShadowmapTexture3;
+uniform sampler2DShadow lightShadowmapTexture4;
+uniform sampler2DShadow lightShadowmapTexture5;
+uniform mat4 light_shadowmap_projection0;
+uniform mat4 light_shadowmap_projection1;
+uniform mat4 light_shadowmap_projection2;
+uniform mat4 light_shadowmap_projection3;
+uniform mat4 light_shadowmap_projection4;
+uniform mat4 light_shadowmap_projection5;
 
 in vec3 position;
 in vec3 normal;
@@ -133,13 +143,90 @@ void main()
     vec3 light_color = (diffuse(-light_vector) + specular(-light_vector)) * light_attenuation * point_light_color;
     
     { // Add light color
-        vec4 ndc = light_shadowmap_projection * vec4(position, 1.0);
+        mat4 projection = light_shadowmap_projection0;
+        
+        vec4 ndc = projection * vec4(position, 1.0);
         vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
         
         if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
             shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
     
-            if (texture(lightShadowmapTexture, shadowmap_texcoord) > 0.5) {
+            if (texture(lightShadowmapTexture0, shadowmap_texcoord) > 0.5) {
+                color += light_color;
+            }
+        }
+    }
+    
+    { // Add light color
+        mat4 projection = light_shadowmap_projection1;
+        
+        vec4 ndc = projection * vec4(position, 1.0);
+        vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
+        
+        if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
+            shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
+    
+            if (texture(lightShadowmapTexture1, shadowmap_texcoord) > 0.5) {
+                color += light_color;
+            }
+        }
+    }
+    
+    { // Add light color
+        mat4 projection = light_shadowmap_projection2;
+        
+        vec4 ndc = projection * vec4(position, 1.0);
+        vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
+        
+        if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
+            shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
+    
+            if (texture(lightShadowmapTexture2, shadowmap_texcoord) > 0.5) {
+                color += light_color;
+            }
+        }
+    }
+    
+    { // Add light color
+        mat4 projection = light_shadowmap_projection3;
+        
+        vec4 ndc = projection * vec4(position, 1.0);
+        vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
+        
+        if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
+            shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
+    
+            if (texture(lightShadowmapTexture3, shadowmap_texcoord) > 0.5) {
+                color += light_color;
+            }
+        }
+    }
+    
+    { // Add light color
+        mat4 projection = light_shadowmap_projection4;
+        
+        vec4 ndc = projection * vec4(position, 1.0);
+        vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
+        
+        if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
+            shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
+    
+            if (texture(lightShadowmapTexture4, shadowmap_texcoord) > 0.5) {
+                color += light_color;
+            }
+        }
+    }
+    
+    { // Add light color
+        mat4 projection = light_shadowmap_projection5;
+        
+        vec4 ndc = projection * vec4(position, 1.0);
+        vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
+        
+        if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
+            shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
+    
+            if (texture(lightShadowmapTexture5, shadowmap_texcoord) > 0.5) {
                 color += light_color;
             }
         }
@@ -174,8 +261,18 @@ void main()
     GLuint shadowmapTexture_location;
     GLuint shadowmap_projection_location;
 
-    GLuint lightShadowmapTexture_location;
-    GLuint light_shadowmap_projection_location;
+    GLuint lightShadowmapTexture0_location;
+    GLuint lightShadowmapTexture1_location;
+    GLuint lightShadowmapTexture2_location;
+    GLuint lightShadowmapTexture3_location;
+    GLuint lightShadowmapTexture4_location;
+    GLuint lightShadowmapTexture5_location;
+    GLuint light_shadowmap_projection0_location;
+    GLuint light_shadowmap_projection1_location;
+    GLuint light_shadowmap_projection2_location;
+    GLuint light_shadowmap_projection3_location;
+    GLuint light_shadowmap_projection4_location;
+    GLuint light_shadowmap_projection5_location;
 
     static GLuint create_shader(GLenum type, const char * source)
     {
@@ -230,8 +327,18 @@ public:
     GLuint shadowmapTexture;
     glm::mat4 shadowmap_projection;
     
-    GLuint lightShadowmapTexture;
-    glm::mat4 light_shadowmap_projection;
+    GLuint lightShadowmapTexture0;
+    GLuint lightShadowmapTexture1;
+    GLuint lightShadowmapTexture2;
+    GLuint lightShadowmapTexture3;
+    GLuint lightShadowmapTexture4;
+    GLuint lightShadowmapTexture5;
+    glm::mat4 light_shadowmap_projection0;
+    glm::mat4 light_shadowmap_projection1;
+    glm::mat4 light_shadowmap_projection2;
+    glm::mat4 light_shadowmap_projection3;
+    glm::mat4 light_shadowmap_projection4;
+    glm::mat4 light_shadowmap_projection5;
 
     SourceShader() {
         // Init program:
@@ -255,8 +362,18 @@ public:
         hasAlphaTexture_location = glGetUniformLocation(program, "hasAlphaTexture");
         shadowmapTexture_location = glGetUniformLocation(program, "shadowmapTexture");
         shadowmap_projection_location = glGetUniformLocation(program, "shadowmap_projection");
-        lightShadowmapTexture_location = glGetUniformLocation(program, "lightShadowmapTexture");
-        light_shadowmap_projection_location = glGetUniformLocation(program, "light_shadowmap_projection");
+        lightShadowmapTexture0_location = glGetUniformLocation(program, "lightShadowmapTexture0");
+        lightShadowmapTexture1_location = glGetUniformLocation(program, "lightShadowmapTexture1");
+        lightShadowmapTexture2_location = glGetUniformLocation(program, "lightShadowmapTexture2");
+        lightShadowmapTexture3_location = glGetUniformLocation(program, "lightShadowmapTexture3");
+        lightShadowmapTexture4_location = glGetUniformLocation(program, "lightShadowmapTexture4");
+        lightShadowmapTexture5_location = glGetUniformLocation(program, "lightShadowmapTexture5");
+        light_shadowmap_projection0_location = glGetUniformLocation(program, "light_shadowmap_projection0");
+        light_shadowmap_projection1_location = glGetUniformLocation(program, "light_shadowmap_projection1");
+        light_shadowmap_projection2_location = glGetUniformLocation(program, "light_shadowmap_projection2");
+        light_shadowmap_projection3_location = glGetUniformLocation(program, "light_shadowmap_projection3");
+        light_shadowmap_projection4_location = glGetUniformLocation(program, "light_shadowmap_projection4");
+        light_shadowmap_projection5_location = glGetUniformLocation(program, "light_shadowmap_projection5");
 
         // Init vao
         glGenVertexArrays(1, &vao);
@@ -312,9 +429,34 @@ public:
         glUniformMatrix4fv(shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
         
         glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, lightShadowmapTexture);
-        glUniform1i(lightShadowmapTexture_location, 3);
-        glUniformMatrix4fv(light_shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&light_shadowmap_projection));
+        glBindTexture(GL_TEXTURE_2D, lightShadowmapTexture0);
+        glUniform1i(lightShadowmapTexture0_location, 3);
+        glUniformMatrix4fv(light_shadowmap_projection0_location, 1, GL_FALSE, reinterpret_cast<float *>(&light_shadowmap_projection0));
+        
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, lightShadowmapTexture1);
+        glUniform1i(lightShadowmapTexture1_location, 4);
+        glUniformMatrix4fv(light_shadowmap_projection1_location, 1, GL_FALSE, reinterpret_cast<float *>(&light_shadowmap_projection1));
+        
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, lightShadowmapTexture2);
+        glUniform1i(lightShadowmapTexture2_location, 5);
+        glUniformMatrix4fv(light_shadowmap_projection2_location, 1, GL_FALSE, reinterpret_cast<float *>(&light_shadowmap_projection2));
+        
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, lightShadowmapTexture3);
+        glUniform1i(lightShadowmapTexture3_location, 6);
+        glUniformMatrix4fv(light_shadowmap_projection3_location, 1, GL_FALSE, reinterpret_cast<float *>(&light_shadowmap_projection3));
+        
+        glActiveTexture(GL_TEXTURE7);
+        glBindTexture(GL_TEXTURE_2D, lightShadowmapTexture4);
+        glUniform1i(lightShadowmapTexture4_location, 7);
+        glUniformMatrix4fv(light_shadowmap_projection4_location, 1, GL_FALSE, reinterpret_cast<float *>(&light_shadowmap_projection4));
+        
+        glActiveTexture(GL_TEXTURE8);
+        glBindTexture(GL_TEXTURE_2D, lightShadowmapTexture5);
+        glUniform1i(lightShadowmapTexture5_location, 8);
+        glUniformMatrix4fv(light_shadowmap_projection5_location, 1, GL_FALSE, reinterpret_cast<float *>(&light_shadowmap_projection5));
         
         { // Draw full scene
             glBindVertexArray(vao);
@@ -500,9 +642,6 @@ void main()
     GLuint program;
     
     GLuint projection_location;
-    GLuint lightPos_location;
-    GLuint far_location;
-    GLuint near_location;
 
     GLuint shadowmap_rbo;
     GLuint shadowmap_fbo;
@@ -549,9 +688,6 @@ public:
     GLuint shadowmapTexture;
 
     glm::mat4 projection;
-    float near;
-    float far;
-    PointLight pointLight;
 
     PointShadowmapShader() {
         // Init program:
@@ -560,9 +696,6 @@ public:
         program = create_program(shadowmap_vertex_shader, shadowmap_fragment_shader);
         
         projection_location = glGetUniformLocation(program, "projection");
-        lightPos_location = glGetUniformLocation(program, "lightPos");
-        far_location = glGetUniformLocation(program, "far");
-        near_location = glGetUniformLocation(program, "near");
 
         // Make textures:
         glGenTextures(1, &shadowmapTexture);
@@ -603,9 +736,6 @@ public:
         glUseProgram(program);
 
         glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
-        glUniform1f(near_location, near);
-        glUniform1f(far_location, far);
-        glUniform3f(lightPos_location, pointLight.position.x, pointLight.position.y, pointLight.position.z);
 
         { // Draw full scene
             glBindVertexArray(sourceShader.vao);
