@@ -140,32 +140,41 @@ void main()
         
         if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
             shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
-            float textureValue;
 
-            switch (i) {
-            case 0:
-                textureValue = texture(lightShadowmapTexture[0], shadowmap_texcoord);
-                break;
-            case 1:
-                textureValue = texture(lightShadowmapTexture[1], shadowmap_texcoord);
-                break;
-            case 2:
-                textureValue = texture(lightShadowmapTexture[2], shadowmap_texcoord);
-                break;
-            case 3:
-                textureValue = texture(lightShadowmapTexture[3], shadowmap_texcoord);
-                break;
-            case 4:
-                textureValue = texture(lightShadowmapTexture[4], shadowmap_texcoord);
-                break;
-            case 5:
-                textureValue = texture(lightShadowmapTexture[5], shadowmap_texcoord);
-                break;
+
+            float sum = 0.0;
+            float sum_w = 0.0;
+            const int N = 5;
+            float radius = 7.0;
+            for (int x = -N; x <= N; x += 1) {
+                for (int y = -N; y <= N; y += 1) {
+                    float c = exp(-float(x * x + y * y) / (radius*radius));
+                    sum_w += c;
+
+                    switch (i) {
+                    case 0:
+                        sum += c * texture(lightShadowmapTexture[0], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[0], 0), 1.0));
+                        break;
+                    case 1:
+                        sum += c * texture(lightShadowmapTexture[1], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[1], 0), 1.0));
+                        break;
+                    case 2:
+                        sum += c * texture(lightShadowmapTexture[2], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[2], 0), 1.0));
+                        break;
+                    case 3:
+                        sum += c * texture(lightShadowmapTexture[3], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[3], 0), 1.0));
+                        break;
+                    case 4:
+                        sum += c * texture(lightShadowmapTexture[4], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[4], 0), 1.0));
+                        break;
+                    case 5:
+                        sum += c * texture(lightShadowmapTexture[5], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[5], 0), 1.0));
+                        break;
+                    }
+                }
             }
     
-            if (textureValue > 0.5) {
-                color += light_color;
-            }
+            color += sum / sum_w * light_color;
         }
     }
 
@@ -592,12 +601,12 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, LIGHT_SHADOWMAP_RESOLUTION, LIGHT_SHADOWMAP_RESOLUTION, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 
         // Make framebuffers:
         glGenRenderbuffers(1, &shadowmap_rbo);
         glBindRenderbuffer(GL_RENDERBUFFER, shadowmap_rbo);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, LIGHT_SHADOWMAP_RESOLUTION, LIGHT_SHADOWMAP_RESOLUTION);
 
         glGenFramebuffers(1, &shadowmap_fbo);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, shadowmap_fbo);
@@ -612,7 +621,7 @@ public:
         const obj_data & scene
     ) {
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, shadowmap_fbo);
-        glViewport(0, 0, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION);
+        glViewport(0, 0, LIGHT_SHADOWMAP_RESOLUTION, LIGHT_SHADOWMAP_RESOLUTION);
         glClear(GL_DEPTH_BUFFER_BIT);
 
         glEnable(GL_DEPTH_TEST);

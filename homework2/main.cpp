@@ -124,6 +124,7 @@ int main() try
 
     float time = 0.f;
     bool paused = false;
+    bool space_released = true;
     auto last_frame_start = std::chrono::high_resolution_clock::now();
     
     std::map<SDL_Keycode, bool> button_down;
@@ -189,7 +190,9 @@ int main() try
             auto now = std::chrono::high_resolution_clock::now();
             float dt = std::chrono::duration_cast<std::chrono::duration<float>>(now - last_frame_start).count();
             last_frame_start = now;
-            time += dt;
+
+            if (!paused)
+                time += dt;
 
             if (button_down[SDLK_w]) {
                 camera.MoveForward(dt);
@@ -203,10 +206,18 @@ int main() try
             if (button_down[SDLK_RIGHT]) {
                 camera.RotateRight(dt);
             }
+
+            if (button_down[SDLK_SPACE]) {
+                if (space_released)
+                    paused = !paused;
+                space_released = false;
+            } else {
+                space_released = true;
+            }
         }
 
         SunLight sun = { UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f), SUN_COLOR };
-        PointLight light = { LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.3f), LIGHT_COLOR, LIGHT_ATTENUATION };
+        PointLight light = { LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.2f), LIGHT_COLOR, LIGHT_ATTENUATION };
 
         glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun.direction);
 

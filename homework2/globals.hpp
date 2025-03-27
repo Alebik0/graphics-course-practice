@@ -33,3 +33,4 @@ const glm::vec3 INITIAL_CAMERA_PWWOSITION(1000.f, 125.f, 0.f);
 const glm::vec3 LIGHT_POSITION(1200.f, 250.f, 0.f);
 const glm::vec3 LIGHT_DELTA(0.f, 0.f, 500.f);
 const GLsizei SHADOWMAP_RESOLUTION = 4096;
+const GLsizei LIGHT_SHADOWMAP_RESOLUTION = 512;
