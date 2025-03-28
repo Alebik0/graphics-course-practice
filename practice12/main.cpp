@@ -128,6 +128,7 @@ void main()
     float tmax = intersection.y;
     vec3 light_color = vec3(16.0);
     vec3 color = vec3(0.0);
+    vec3 ambient_light = 4.0 * vec3(0.6, 0.8, 1.0);
 
     float optical_depth = 0.0;
     int N = 64;
@@ -153,7 +154,7 @@ void main()
             light_optical_depth += extinction * light_density * light_dt;
         }
 
-        color += light_color * exp(-light_optical_depth) *
+        color += (light_color * exp(-light_optical_depth) + ambient_light) *
             exp(-optical_depth) * dt * density *
             scattering / 4.0 / PI;
     }
