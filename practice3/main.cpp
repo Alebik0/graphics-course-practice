@@ -35,15 +35,16 @@ uniform mat4 view;
 
 layout (location = 0) in vec2 in_position;
 layout (location = 1) in vec4 in_color;
+layout (location = 2) in float in_distance;
 
 out vec4 color;
-out vec2 position;
+out float distance;
 
 void main()
 {
     gl_Position = view * vec4(in_position, 0.0, 1.0);
     color = in_color;
-    position = in_position;
+    distance = in_distance;
 }
 )";
 
@@ -51,7 +52,7 @@ const char fragment_shader_source[] =
 R"(#version 330 core
 
 in vec4 color;
-in vec2 position;
+in float distance;
 
 layout (location = 0) out vec4 out_color;
 
@@ -60,7 +61,6 @@ uniform float dash;
 void main()
 {
     if (dash > 0.5) {
-        float distance = abs(position.x) + abs(position.y);
         if (mod(distance, 40.0) < 20.0) {
             discard;
         }
@@ -121,6 +121,7 @@ struct vertex
 {
     vec2 position;
     std::uint8_t color[4];
+    float distance;
 };
 
 vec2 bezier(std::vector<vertex> const & vertices, float t)
@@ -142,6 +143,7 @@ vec2 bezier(std::vector<vertex> const & vertices, float t)
 
 void updateBezierArray(std::vector<vertex>& bezier_vertexes, std::vector<vertex> const & path_vertexes, int quality) {
     bezier_vertexes = {};
+    float distance = 0.f;
                 
     for (int i = 0; i < path_vertexes.size(); i++) {
         for (int j = 0; j < quality; j++) {
@@ -149,7 +151,18 @@ void updateBezierArray(std::vector<vertex>& bezier_vertexes, std::vector<vertex>
             int mnum = path_vertexes.size() * quality - 1;
             float t = ((float) num) / mnum;
             vec2 bez_point = bezier(path_vertexes, t);
-            vertex bez_vertex = vertex(bez_point, { 255, 0, 0, 1 });
+            vertex bez_vertex;
+
+            if (bezier_vertexes.size() > 0) {
+                vertex vert = bezier_vertexes[bezier_vertexes.size() - 1];
+                float dx = bez_point.x - vert.position.x;
+                float dy = bez_point.y - vert.position.y;
+                float distance = vert.distance + std::sqrt(dx * dx + dy * dy);
+                bez_vertex = vertex(bez_point, { 255, 0, 0, 1 }, distance);
+            } else {
+                bez_vertex = vertex(bez_point, { 255, 0, 0, 1 }, 0.f);
+            }
+
             bezier_vertexes.push_back(bez_vertex);
         }
     }
@@ -225,14 +238,18 @@ int main() try
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)(0));
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(vertex), (void*)(8));
+    glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(vertex), (void*)(sizeof(vec2)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_TRUE, sizeof(vertex), (void*)(sizeof(vec2) + 4 * sizeof(std::uint8_t)));
 
     glBindVertexArray(vao_bezier);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_bezier);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)(0));
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(vertex), (void*)(8));
+    glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(vertex), (void*)(sizeof(vec2)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)(sizeof(vec2) + 4 * sizeof(std::uint8_t)));
 
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
@@ -260,7 +277,7 @@ int main() try
             {
                 float mouse_x = event.button.x;
                 float mouse_y = event.button.y;
-                vertex mouse_v = vertex(vec2(mouse_x, mouse_y), { 0, 0, 0, 1 });
+                vertex mouse_v = vertex(vec2(mouse_x, mouse_y), { 0, 0, 0, 1 }, 0.f);
                 path_vertexes.push_back(mouse_v);
 
                 updateBezierArray(bezier_vertexes, path_vertexes, quality);
