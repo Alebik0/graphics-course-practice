@@ -405,12 +405,10 @@ int main() try
             model = glm::rotate(model, model_angle, {0.f, 1.f, 0.f});
             model = glm::scale(model, glm::vec3(2 * model_scale));
 
-            glm::mat4 view(1.f);
-            view = glm::translate(view, {0.f, 0.f, -camera_distance});
-            view = glm::rotate(view, glm::pi<float>() / 2, {1.f, 0.f, 0.f});
+            glm::mat4 view = glm::lookAt(glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
 
             float aspect = (float) width / (float) height;
-            glm::mat4 projection = glm::ortho(-1.f, 1.f, -1.f * aspect, 1.f * aspect, near, far);
+            glm::mat4 projection = glm::ortho(-1.f * aspect, 1.f * aspect, -1.f, 1.f, near, far);
 
             glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
 
@@ -428,12 +426,10 @@ int main() try
             model = glm::rotate(model, model_angle, {0.f, 1.f, 0.f});
             model = glm::scale(model, glm::vec3(2 * model_scale));
 
-            glm::mat4 view(1.f);
-            view = glm::translate(view, {0.f, 0.f, -camera_distance});
-            view = glm::rotate(view, glm::pi<float>() / 2, {0.f, 1.f, 0.f});
+            glm::mat4 view = glm::lookAt(glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(1.f, 0.f, 0.f));
 
             float aspect = (float) width / (float) height;
-            glm::mat4 projection = glm::ortho(-1.f, 1.f, -1.f * aspect, 1.f * aspect, near, far);
+            glm::mat4 projection = glm::ortho(-1.f * aspect, 1.f * aspect, -1.f, 1.f, near, far);
 
             glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
 
@@ -451,12 +447,10 @@ int main() try
             model = glm::rotate(model, model_angle, {0.f, 1.f, 0.f});
             model = glm::scale(model, glm::vec3(2 * model_scale));
 
-            glm::mat4 view(1.f);
-            view = glm::translate(view, {0.f, 0.f, -camera_distance});
-            view = glm::rotate(view, glm::pi<float>() / 2, {0.f, 0.f, 1.f});
+            glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
 
             float aspect = (float) width / (float) height;
-            glm::mat4 projection = glm::ortho(-1.f, 1.f, -1.f * aspect, 1.f * aspect, near, far);
+            glm::mat4 projection = glm::ortho(-1.f * aspect, 1.f * aspect, -1.f, 1.f, near, far);
 
             glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
 
