@@ -109,7 +109,7 @@ void main()
 
     vec3 color = ambient_color + sun_color + light_color;
     
-    out_color = vec4(color, 1.0);
+    out_color = vec4(color, 0.5);
 }
 )";
 
