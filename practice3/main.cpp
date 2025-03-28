@@ -269,19 +269,23 @@ int main() try
             }
             else if (event.button.button == SDL_BUTTON_RIGHT)
             {
-                path_vertexes.pop_back();
-                updateBezierArray(bezier_vertexes, path_vertexes, quality);
-                updateBuffer(vao_path, vbo_path, path_vertexes);
-                updateBuffer(vao_bezier, vbo_bezier, bezier_vertexes);
+                if (path_vertexes.size() > 0) {
+                    path_vertexes.pop_back();
+                    updateBezierArray(bezier_vertexes, path_vertexes, quality);
+                    updateBuffer(vao_path, vbo_path, path_vertexes);
+                    updateBuffer(vao_bezier, vbo_bezier, bezier_vertexes);
+                }
             }
             break;
         case SDL_KEYDOWN:
             if (event.key.keysym.sym == SDLK_LEFT)
             {
-                quality -= 1;
-                updateBezierArray(bezier_vertexes, path_vertexes, quality);
-                updateBuffer(vao_path, vbo_path, path_vertexes);
-                updateBuffer(vao_bezier, vbo_bezier, bezier_vertexes);
+                if (quality > 1) {
+                    quality -= 1;
+                    updateBezierArray(bezier_vertexes, path_vertexes, quality);
+                    updateBuffer(vao_path, vbo_path, path_vertexes);
+                    updateBuffer(vao_bezier, vbo_bezier, bezier_vertexes);
+                }
             }
             else if (event.key.keysym.sym == SDLK_RIGHT)
             {
