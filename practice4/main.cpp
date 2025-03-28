@@ -178,7 +178,7 @@ int main() try
     obj_data bunny = parse_obj(project_root + "/bunny.obj");
 
     // Gen vao, vbo, ebo:
-    GLuint vao[3], vbo[3], ebo[3];
+    GLuint vao, vbo, ebo;
 
     // Bunny parameters:
     float bunny_offset_xs[3] = { 1.f, -1.f, -1.f };
@@ -188,25 +188,23 @@ int main() try
     const int position_index = 0;
     const int normal_index = 1;
 
-    for (int i = 0; i < 3; i++) {
-        glGenVertexArrays(1, vao + i);
-        glGenBuffers(1, vbo + i);
-        glGenBuffers(1, ebo + i);
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
 
-        glBindVertexArray(vao[i]);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo[i]);
-        glEnableVertexAttribArray(position_index);
-        glEnableVertexAttribArray(normal_index);
-        glVertexAttribPointer(position_index, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void *)(0));
-        glVertexAttribPointer(normal_index, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void *)(sizeof(std::array<float, 3>)));
- 
-        // Set up buffer data:
-        glBindVertexArray(vao[i]);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo[i]);
-        glBufferData(GL_ARRAY_BUFFER, bunny.vertices.size() * sizeof(obj_data::vertex), bunny.vertices.data(), GL_STATIC_DRAW);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo[i]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, bunny.indices.size() * sizeof(std::uint32_t), bunny.indices.data(), GL_STATIC_DRAW);
-    }
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glEnableVertexAttribArray(position_index);
+    glEnableVertexAttribArray(normal_index);
+    glVertexAttribPointer(position_index, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void *)(0));
+    glVertexAttribPointer(normal_index, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void *)(sizeof(std::array<float, 3>)));
+
+    // Set up buffer data:
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, bunny.vertices.size() * sizeof(obj_data::vertex), bunny.vertices.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, bunny.indices.size() * sizeof(std::uint32_t), bunny.indices.data(), GL_STATIC_DRAW);
 
     // Draw loop:
     auto last_frame_start = std::chrono::high_resolution_clock::now();
@@ -311,12 +309,12 @@ int main() try
             0.f, 0.f, -1.f, 0.f
         };
 
-        glUniformMatrix4fv(view_location, 1, GL_TRUE, view);
-        glUniformMatrix4fv(projection_location, 1, GL_TRUE, projection);
 
         for (int i = 0; i < 3; i++) {
             glUniformMatrix4fv(model_location, 1, GL_TRUE, models[i]);
-            glBindVertexArray(vao[i]);
+            glUniformMatrix4fv(view_location, 1, GL_TRUE, view);
+            glUniformMatrix4fv(projection_location, 1, GL_TRUE, projection);
+            glBindVertexArray(vao);
             glDrawElements(GL_TRIANGLES, bunny.indices.size(), GL_UNSIGNED_INT, (void *)(0));
         }
 
