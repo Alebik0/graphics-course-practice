@@ -118,9 +118,9 @@ vec3 texcoord(vec3 p) {
 
 void main()
 {
-    const float absorption = 0.0;
-    const float scattering = 4.0;
-    const float extinction = absorption + scattering;
+    const vec3 absorption = vec3(0.0);
+    const vec3 scattering = vec3(1.0, 4.0, 8.0);
+    const vec3 extinction = absorption + scattering;
 
     vec3 camera_out = normalize(-camera_position + position);
     vec2 intersection = intersect_bbox(camera_position, camera_out);
@@ -130,7 +130,7 @@ void main()
     vec3 color = vec3(0.0);
     vec3 ambient_light = 4.0 * vec3(0.6, 0.8, 1.0);
 
-    float optical_depth = 0.0;
+    vec3 optical_depth = vec3(0.0);
     int N = 64;
     int M = 16;
     
@@ -141,7 +141,7 @@ void main()
         float density = texture(texture_sampler, texcoord(p)).r;
         optical_depth += extinction * density * dt;
 
-        float light_optical_depth = 0.0;
+        vec3 light_optical_depth = vec3(0.0);
         vec2 light_intersection = intersect_bbox(p, light_direction);
         float light_tmin = max(light_intersection.x, 0.0);
         float light_tmax = light_intersection.y;
@@ -159,9 +159,11 @@ void main()
             scattering / 4.0 / PI;
     }
 
-    float opacity = 1.0 - exp(-optical_depth);
+    vec3 opacity = 1.0 - exp(-optical_depth);
 
-    out_color = vec4(color, opacity);
+    color = mix(vec3(0.6, 0.8, 1.0), color, opacity);
+
+    out_color = vec4(color, 1.0);
 }
 )";
 
