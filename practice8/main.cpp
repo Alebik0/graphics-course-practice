@@ -102,22 +102,29 @@ vec3 phong(vec3 direction) {
 
 void main()
 {
+    const float ambient_light = 0.2;
     vec4 ndc = shadowmap_projection * vec4(position, 1.0);
 
     if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
         vec3 shadowmap_texcoord = ndc.xyz * 0.5 + 0.5;
 
-        if (texture(shadowmap_texture, shadowmap_texcoord) < 0.5) {
-            float ambient_light = 0.2;
-            vec3 color = albedo * ambient_light;
-            out_color = vec4(color, 1.0);
-        } else {
-            float ambient_light = 0.2;
-            vec3 color = albedo * ambient_light + sun_color * phong(sun_direction);
-            out_color = vec4(color, 1.0);
+        // Gauessian blur:
+        float sum = 0.0;
+        float sum_w = 0.0;
+        const int N = 5;
+        float radius = 7.0;
+        for (int x = -N; x <= N; x += 1) {
+            for (int y = -N; y <= N; y += 1) {
+                float c = exp(-float(x * x + y * y) / (radius*radius));
+                sum += c * texture(shadowmap_texture, shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(shadowmap_texture, 0), 1.0));
+                sum_w += c;
+            }
         }
+
+        float shadow_factor = sum / sum_w;
+        vec3 color = albedo * ambient_light + shadow_factor * sun_color * phong(sun_direction);
+        out_color = vec4(color, 1.0);
     } else {
-        float ambient_light = 0.2;
         vec3 color = albedo * ambient_light + sun_color * phong(sun_direction);
         out_color = vec4(color, 1.0);
     }
