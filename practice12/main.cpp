@@ -72,6 +72,7 @@ uniform vec3 camera_position;
 uniform vec3 light_direction;
 uniform vec3 bbox_min;
 uniform vec3 bbox_max;
+uniform sampler3D texture_sampler;
 
 layout (location = 0) out vec4 out_color;
 
@@ -123,8 +124,11 @@ void main()
 
     float optical_depth = (tmax - tmin) * absorption;
     float opacity = 1.0 - exp(-optical_depth);
+    vec3 p = camera_position + camera_out * (tmin + tmax) / 2.0;
+    vec3 texcoord = (p - bbox_min) / (bbox_max - bbox_min);
+    float value = texture(texture_sampler, texcoord).r;
 
-    out_color = vec4(0.3, 0.0, 0.3, opacity);
+    out_color = vec4(vec3(value), opacity);
 }
 )";
 
@@ -247,6 +251,7 @@ int main() try
     GLuint bbox_max_location = glGetUniformLocation(program, "bbox_max");
     GLuint camera_position_location = glGetUniformLocation(program, "camera_position");
     GLuint light_direction_location = glGetUniformLocation(program, "light_direction");
+    GLuint texture_sampler_location = glGetUniformLocation(program, "texture_sampler");
 
     GLuint vao, vbo, ebo;
     glGenVertexArrays(1, &vao);
@@ -265,6 +270,26 @@ int main() try
 
     const std::string project_root = PROJECT_ROOT;
     const std::string cloud_data_path = project_root + "/cloud.data";
+    GLuint cubeTexture;
+
+    { // Make texture
+        const int width = 128;
+        const int height = 64;
+        const int depth = 64;
+        std::vector<char> pixels(width * height * depth);
+        std::ifstream input(cloud_data_path, std::ios::binary);
+        input.read(pixels.data(), pixels.size());
+
+        glGenTextures(1, &cubeTexture);
+        glBindTexture(GL_TEXTURE_3D, cubeTexture);
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, width, height, depth, 0, GL_RED, GL_UNSIGNED_BYTE, pixels.data());
+    }
 
     const glm::vec3 cloud_bbox_min{-2.f, -1.f, -1.f};
     const glm::vec3 cloud_bbox_max{ 2.f,  1.f,  1.f};
@@ -368,6 +393,10 @@ int main() try
         glUniform3fv(bbox_max_location, 1, reinterpret_cast<const float *>(&cloud_bbox_max));
         glUniform3fv(camera_position_location, 1, reinterpret_cast<float *>(&camera_position));
         glUniform3fv(light_direction_location, 1, reinterpret_cast<float *>(&light_direction));
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_3D, cubeTexture);
+        glUniform1f(texture_sampler_location, 1);
 
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, std::size(cube_indices), GL_UNSIGNED_INT, nullptr);
