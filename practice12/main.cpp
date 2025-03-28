@@ -113,7 +113,18 @@ in vec3 position;
 
 void main()
 {
-    out_color = vec4(1.0, 0.5, 0.5, 1.0);
+    const float absorption = 1.0;
+
+    vec3 camera_out = -camera_position + position;
+    camera_out = normalize(camera_out);
+    vec2 intersection = intersect_bbox(camera_position, camera_out);
+    float tmin = max(intersection.x, 0.0);
+    float tmax = intersection.y;
+
+    float optical_depth = (tmax - tmin) * absorption;
+    float opacity = 1.0 - exp(-optical_depth);
+
+    out_color = vec4(0.3, 0.0, 0.3, opacity);
 }
 )";
 
