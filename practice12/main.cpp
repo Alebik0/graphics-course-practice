@@ -112,41 +112,55 @@ const float PI = 3.1415926535;
 
 in vec3 position;
 
+vec3 texcoord(vec3 p) {
+    return (p - bbox_min) / (bbox_max - bbox_min);
+}
+
 void main()
 {
-    const float absorption = 1.0;
+    const float absorption = 0.0;
+    const float scattering = 4.0;
+    const float extinction = absorption + scattering;
 
-    vec3 camera_out = -camera_position + position;
-    camera_out = normalize(camera_out);
+    vec3 camera_out = normalize(-camera_position + position);
     vec2 intersection = intersect_bbox(camera_position, camera_out);
     float tmin = max(intersection.x, 0.0);
     float tmax = intersection.y;
+    vec3 light_color = vec3(16.0);
+    vec3 color = vec3(0.0);
 
-    float value;
-    float opacity;
-    { // Calculate color:
-        vec3 p = camera_position + camera_out * (tmin + tmax) / 2.0;
-        vec3 texcoord = (p - bbox_min) / (bbox_max - bbox_min);
-        value = texture(texture_sampler, texcoord).r;
-    }
-
-    { // Calculate opacity:
-        float optical_depth = 0.0;
-        int N = 64;
+    float optical_depth = 0.0;
+    int N = 64;
+    int M = 16;
+    
+    for (int i = 0; i < N; i++) {
         float dt = (tmax - tmin) / N;
+        float t = tmin + (i + 0.5) * dt;
+        vec3 p = camera_position + t * camera_out;
+        float density = texture(texture_sampler, texcoord(p)).r;
+        optical_depth += extinction * density * dt;
+
+        float light_optical_depth = 0.0;
+        vec2 light_intersection = intersect_bbox(p, light_direction);
+        float light_tmin = max(light_intersection.x, 0.0);
+        float light_tmax = light_intersection.y;
         
-        for (int i = 0; i < N; i++) {
-            float t = tmin + (i + 0.5) * dt;
-            vec3 p = camera_position + t * camera_out;
-            vec3 texcoord = (p - bbox_min) / (bbox_max - bbox_min);
-            float density = texture(texture_sampler, texcoord).r;
-            optical_depth += absorption * density * dt;
+        for (int j = 0; j < M; j++) {
+            float light_dt = (light_tmax - light_tmin) / M;
+            float light_t = light_tmin + (j + 0.5) * light_dt;
+            vec3 light_p = p + light_t * light_direction;
+            float light_density = texture(texture_sampler, texcoord(light_p)).r;
+            light_optical_depth += extinction * light_density * light_dt;
         }
 
-        opacity = 1.0 - exp(-optical_depth);
+        color += light_color * exp(-light_optical_depth) *
+            exp(-optical_depth) * dt * density *
+            scattering / 4.0 / PI;
     }
 
-    out_color = vec4(vec3(value), opacity);
+    float opacity = 1.0 - exp(-optical_depth);
+
+    out_color = vec4(color, opacity);
 }
 )";
 
@@ -305,7 +319,7 @@ int main() try
         glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
         glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, width, height, depth, 0, GL_RED, GL_UNSIGNED_BYTE, pixels.data());
     }
 
