@@ -122,11 +122,29 @@ void main()
     float tmin = max(intersection.x, 0.0);
     float tmax = intersection.y;
 
-    float optical_depth = (tmax - tmin) * absorption;
-    float opacity = 1.0 - exp(-optical_depth);
-    vec3 p = camera_position + camera_out * (tmin + tmax) / 2.0;
-    vec3 texcoord = (p - bbox_min) / (bbox_max - bbox_min);
-    float value = texture(texture_sampler, texcoord).r;
+    float value;
+    float opacity;
+    { // Calculate color:
+        vec3 p = camera_position + camera_out * (tmin + tmax) / 2.0;
+        vec3 texcoord = (p - bbox_min) / (bbox_max - bbox_min);
+        value = texture(texture_sampler, texcoord).r;
+    }
+
+    { // Calculate opacity:
+        float optical_depth = 0.0;
+        int N = 64;
+        float dt = (tmax - tmin) / N;
+        
+        for (int i = 0; i < N; i++) {
+            float t = tmin + (i + 0.5) * dt;
+            vec3 p = camera_position + t * camera_out;
+            vec3 texcoord = (p - bbox_min) / (bbox_max - bbox_min);
+            float density = texture(texture_sampler, texcoord).r;
+            optical_depth += absorption * density * dt;
+        }
+
+        opacity = 1.0 - exp(-optical_depth);
+    }
 
     out_color = vec4(vec3(value), opacity);
 }
