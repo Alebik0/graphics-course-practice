@@ -346,11 +346,8 @@ int main() try
         float near = 0.1f;
         float far = 100.f;
         float scale = 0.75 + cos(time) * 0.25;
-        std::vector<glm::mat4x3> array(input_model.bones.size());
-        for (int i = 0; i < input_model.bones.size(); i++)
-            array[i] = glm::mat4x3(scale);
 
-        glm::mat4 model = glm::scale(glm::mat4(1.f), glm::vec3(1.f));
+        glm::mat4 model = glm::scale(glm::mat4(1.f), glm::vec3(0.01f));
 
         glm::mat4 view(1.f);
         view = glm::translate(view, {0.f, 0.f, -camera_distance});
@@ -364,12 +361,41 @@ int main() try
 
         glm::vec3 light_direction = glm::normalize(glm::vec3(1.f, 2.f, 3.f));
 
+        const int bones_amount = input_model.bones.size();
+        std::vector<glm::mat4x3> bones(bones_amount);
+
+        std::string animation_name = "hip-hop";
+        gltf_model::animation bones_animation = input_model.animations.at(animation_name);
+        std::vector<glm::mat4> bones_transforms;
+
+        for (int i = 0; i < bones_amount; i++) {
+            glm::mat4 transform;
+            {
+                gltf_model::bone_animation bone_animation = bones_animation.bones[i];
+                glm::mat4 translation = glm::translate(glm::mat4(1.f), bone_animation.translation(0.f));
+                glm::mat4 rotation = glm::toMat4(bone_animation.rotation(0.f));
+                glm::mat4 scale = glm::scale(glm::mat4(1.f), bone_animation.scale(0.f));
+                transform = translation * rotation * scale;
+            }
+
+            if (input_model.bones[i].parent != -1) {
+                glm::mat4x3 parent_transform = bones[input_model.bones[i].parent];
+                transform = parent_transform * transform;
+            }
+
+            bones[i] = transform;
+        }
+
+        for (int i = 0; i < bones_amount; i++) {
+            bones[i] = bones[i] * input_model.bones[i].inverse_bind_matrix;
+        }
+
         glUseProgram(program);
         glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
         glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
         glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
         glUniform3fv(light_direction_location, 1, reinterpret_cast<float *>(&light_direction));
-        glUniformMatrix4x3fv(bones_location, input_model.bones.size(), GL_FALSE, reinterpret_cast<float *>(array.data()));
+        glUniformMatrix4x3fv(bones_location, input_model.bones.size(), GL_FALSE, reinterpret_cast<float *>(bones.data()));
 
         auto draw_meshes = [&](bool transparent)
         {
