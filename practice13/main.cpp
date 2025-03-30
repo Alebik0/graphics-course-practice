@@ -371,10 +371,11 @@ int main() try
         for (int i = 0; i < bones_amount; i++) {
             glm::mat4 transform;
             {
+                float frame = std::fmod(time, bones_animation.max_time);
                 gltf_model::bone_animation bone_animation = bones_animation.bones[i];
-                glm::mat4 translation = glm::translate(glm::mat4(1.f), bone_animation.translation(0.f));
-                glm::mat4 rotation = glm::toMat4(bone_animation.rotation(0.f));
-                glm::mat4 scale = glm::scale(glm::mat4(1.f), bone_animation.scale(0.f));
+                glm::mat4 translation = glm::translate(glm::mat4(1.f), bone_animation.translation(frame));
+                glm::mat4 rotation = glm::toMat4(bone_animation.rotation(frame));
+                glm::mat4 scale = glm::scale(glm::mat4(1.f), bone_animation.scale(frame));
                 transform = translation * rotation * scale;
             }
 
