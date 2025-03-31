@@ -48,9 +48,15 @@ R"(#version 330 core
 
 uniform mat4 transform;
 
+layout (location = 0) in vec2 in_position;
+layout (location = 1) in vec2 in_texcoord;
+
+out vec2 texcoord;
+
 void main()
 {
-    gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+    gl_Position = vec4(in_position, 0.0, 1.0);
+    texcoord = in_texcoord;
 }
 )";
 
@@ -59,9 +65,11 @@ R"(#version 330 core
 
 layout (location = 0) out vec4 out_color;
 
+in vec2 texcoord;
+
 void main()
 {
-    out_color = vec4(0.0);
+    out_color = vec4(texcoord, 0.0, 1.0);
 }
 )";
 
@@ -168,6 +176,42 @@ int main() try
         stbi_image_free(data);
     }
 
+    GLuint vao;
+    GLuint vbo_position, vbo_texcoord;
+    { // Init vao, vbo
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+
+        glGenBuffers(1, &vbo_position);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_position);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), reinterpret_cast<void *>(0));
+
+        glGenBuffers(1, &vbo_texcoord);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_texcoord);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), reinterpret_cast<void *>(0));
+    }
+
+    { // Put some data to vbo
+        std::vector<glm::vec2> positions = {
+            glm::vec2(0, 0),
+            glm::vec2(100, 0),
+            glm::vec2(0, 100)
+        };
+        std::vector<glm::vec2> texcoords = {
+            glm::vec2(0, 0),
+            glm::vec2(1, 0),
+            glm::vec2(0, 1)
+        };
+        
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_position);
+        glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(glm::vec2), positions.data(), GL_STATIC_DRAW);
+        
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_texcoord);
+        glBufferData(GL_ARRAY_BUFFER, texcoords.size() * sizeof(glm::vec2), texcoords.data(), GL_STATIC_DRAW);
+    }
+
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
     float time = 0.f;
@@ -225,8 +269,13 @@ int main() try
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+        glUseProgram(msdf_program);
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
+
+        glBindVertexArray(vao);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
 
         SDL_GL_SwapWindow(window);
     }
