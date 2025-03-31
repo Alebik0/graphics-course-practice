@@ -55,7 +55,7 @@ out vec2 texcoord;
 
 void main()
 {
-    gl_Position = vec4(in_position, 0.0, 1.0);
+    gl_Position = transform * vec4(in_position, 0.0, 1.0);
     texcoord = in_texcoord;
 }
 )";
@@ -263,6 +263,10 @@ int main() try
         float dt = std::chrono::duration_cast<std::chrono::duration<float>>(now - last_frame_start).count();
         last_frame_start = now;
 
+        glm::mat4 transform(1.f);
+        transform = glm::translate(transform, glm::vec3(-1.f, 1.f, 0.f));
+        transform = glm::scale(transform, glm::vec3(2.f / width, -2.f / height, 1.f));
+
         glClearColor(0.8f, 0.8f, 1.f, 0.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -270,6 +274,8 @@ int main() try
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         glUseProgram(msdf_program);
+
+        glUniformMatrix4fv(transform_location, 1, GL_FALSE, reinterpret_cast<float *>(&transform));
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
