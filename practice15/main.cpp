@@ -219,6 +219,8 @@ int main() try
 
     bool running = true;
 
+    glm::vec2 bbox_min;
+    glm::vec2 bbox_max;
     std::vector<glm::vec2> positions;
     std::vector<glm::vec2> texcoords;
 
@@ -258,6 +260,8 @@ int main() try
             break;
 
         if (text_changed) { // Put some data to vbo
+            bbox_min = glm::vec2(1e6, 1e6);
+            bbox_max = glm::vec2(-1e6, -1e6);
             positions.clear();
             texcoords.clear();
             glm::vec2 pen(0.f);
@@ -288,6 +292,20 @@ int main() try
 
                 pen.x += c_glyph.advance;
             }
+
+            for (glm::vec2 pos : positions) {
+                bbox_min.x = std::min(bbox_min.x, pos.x);
+                bbox_min.y = std::min(bbox_min.y, pos.y);
+                bbox_max.x = std::max(bbox_max.x, pos.x);
+                bbox_max.y = std::max(bbox_max.y, pos.y);
+            }
+
+            std::cout <<
+                "bbox_min.x=" << bbox_min.x << ", "
+                "bbox_min.y=" << bbox_min.y << ", "
+                "bbox_max.x=" << bbox_max.x << ", "
+                "bbox_max.y=" << bbox_max.y <<
+                std::endl;
             
             glBindBuffer(GL_ARRAY_BUFFER, vbo_position);
             glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(glm::vec2), positions.data(), GL_STATIC_DRAW);
@@ -303,8 +321,9 @@ int main() try
         last_frame_start = now;
 
         glm::mat4 transform(1.f);
-        transform = glm::translate(transform, glm::vec3(-1.f, 1.f, 0.f));
+        transform = glm::translate(transform, glm::vec3(-1.f, 1.f, 0.f)); // [0, 2] -> [-1, 1]
         transform = glm::scale(transform, glm::vec3(2.f / width, -2.f / height, 1.f));
+        transform = glm::translate(transform, glm::vec3(0.5f * (glm::vec2(width, height) - bbox_max + bbox_min), 0.f)); // [bbox_min, bbox_max] -> [width / 2, height / 2]
 
         glClearColor(0.8f, 0.8f, 1.f, 0.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
