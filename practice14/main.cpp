@@ -185,22 +185,12 @@ int main() try
     const std::string project_root = PROJECT_ROOT;
     const std::string model_path = project_root + "/bunny/bunny.gltf";
 
-    std::vector<glm::vec3> instancies;
-    for (int x = -16; x < 16; x++) {
-        for (int y = -16; y < 16; y++) {
-            glm::vec3 offset = glm::vec3((float) x, 0.f, (float) y);
-            instancies.push_back(offset);
-        }
-    }
-
     auto const input_model = load_gltf(model_path);
     GLuint vbo, vbo_inst;
     glGenBuffers(1, &vbo);
     glGenBuffers(1, &vbo_inst);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, input_model.buffer.size(), input_model.buffer.data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_inst);
-    glBufferData(GL_ARRAY_BUFFER, instancies.size() * sizeof(glm::vec3), instancies.data(), GL_STATIC_DRAW);
 
     std::vector<GLuint> vaos;
     for (int i = 0; i < input_model.meshes.size(); ++i)
@@ -375,6 +365,25 @@ int main() try
 
         glm::vec3 light_direction = glm::normalize(glm::vec3(1.f, 2.f, 3.f));
 
+        std::vector<glm::vec3> instancies;
+        { // Work with instancies
+            frustum frustum_obj = frustum(projection * view);
+
+            for (int x = -16; x < 16; x++) {
+                for (int y = -16; y < 16; y++) {
+                    glm::vec3 offset = glm::vec3((float) x, 0.f, (float) y);
+                    aabb aabb_obj = aabb(input_model.meshes[0].min + offset, input_model.meshes[0].max + offset);
+
+                    if (intersect(frustum_obj, aabb_obj)) {
+                        instancies.push_back(offset);
+                    }
+                }
+            }
+
+            glBindBuffer(GL_ARRAY_BUFFER, vbo_inst);
+            glBufferData(GL_ARRAY_BUFFER, instancies.size() * sizeof(glm::vec3), instancies.data(), GL_STATIC_DRAW);
+        }
+
         glUseProgram(program);
         glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
         glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
@@ -386,7 +395,7 @@ int main() try
         {
             auto const & mesh = input_model.meshes[0];
             glBindVertexArray(vaos[0]);
-            glDrawElementsInstanced(GL_TRIANGLES, mesh.indices.count, mesh.indices.type, reinterpret_cast<void *>(mesh.indices.view.offset), 1024);
+            glDrawElementsInstanced(GL_TRIANGLES, mesh.indices.count, mesh.indices.type, reinterpret_cast<void *>(mesh.indices.view.offset), instancies.size());
         }
 
         { // Work with queries
@@ -402,7 +411,7 @@ int main() try
                         freeObjects[i] = true;
                         queryObjects[i] = 0;
 
-                        std::cout << (float) result / 1e6 << " ms, " << (float) 1e9 / result << " fps" << std::endl;
+                        std::cout << result / 1e6 << " ms, " << 1e9 / result << " fps, " << instancies.size() << " inst" << std::endl;
                     }
                 }
             }
