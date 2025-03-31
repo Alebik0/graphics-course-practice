@@ -328,8 +328,8 @@ int main() try {
                 glUniform3f(ambient_light_location, 0.2f, 0.2f, 0.2f);
                 glUniform3f(sun_direction_location, 0.5f, 0.0f, 0.87f);
                 glUniform3f(sun_color_location, 1.0f, 0.9f, 0.8f);
-                glUniform3f(point_light_position_location, 0.f, 0.f, 2.f);
-                glUniform3f(point_light_color_location, 0.f, 1.f, 0.f);
+                glUniform3f(point_light_position_location, std::sin(time), std::cos(time), 2.f);
+                glUniform3f(point_light_color_location, 0.0f, 0.3f, 0.1f);
                 glUniform3f(point_light_attenuation_location, 1.f, 0.f, 0.01f);
                 glUniform1f(glossiness_location, 5.0f);
                 glUniform1f(roughness_location, 0.05f * (1 - 3 * x - y));
