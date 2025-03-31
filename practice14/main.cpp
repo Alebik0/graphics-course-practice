@@ -365,7 +365,7 @@ int main() try
 
         glm::vec3 light_direction = glm::normalize(glm::vec3(1.f, 2.f, 3.f));
 
-        std::vector<glm::vec3> instancies;
+        std::vector<glm::vec3> instancies[6];
         { // Work with instancies
             frustum frustum_obj = frustum(projection * view);
 
@@ -375,27 +375,33 @@ int main() try
                     aabb aabb_obj = aabb(input_model.meshes[0].min + offset, input_model.meshes[0].max + offset);
 
                     if (intersect(frustum_obj, aabb_obj)) {
-                        instancies.push_back(offset);
+                        float lod_step = 16 / 6;
+                        int lod_index = glm::length(offset) / lod_step;
+                        lod_index = std::max(lod_index, 0);
+                        lod_index = std::min(lod_index, 5);
+                        instancies[lod_index].push_back(offset);
                     }
                 }
             }
-
-            glBindBuffer(GL_ARRAY_BUFFER, vbo_inst);
-            glBufferData(GL_ARRAY_BUFFER, instancies.size() * sizeof(glm::vec3), instancies.data(), GL_STATIC_DRAW);
         }
 
-        glUseProgram(program);
-        glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-        glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
-        glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
-        glUniform3fv(light_direction_location, 1, reinterpret_cast<float *>(&light_direction));
+        for (int lod_level = 0; lod_level < 6; lod_level++) {
+            glBindBuffer(GL_ARRAY_BUFFER, vbo_inst);
+            glBufferData(GL_ARRAY_BUFFER, instancies[lod_level].size() * sizeof(glm::vec3), instancies[lod_level].data(), GL_STATIC_DRAW);
 
-        glBindTexture(GL_TEXTURE_2D, texture);
-
-        {
-            auto const & mesh = input_model.meshes[0];
-            glBindVertexArray(vaos[0]);
-            glDrawElementsInstanced(GL_TRIANGLES, mesh.indices.count, mesh.indices.type, reinterpret_cast<void *>(mesh.indices.view.offset), instancies.size());
+            glUseProgram(program);
+            glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
+            glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
+            glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+            glUniform3fv(light_direction_location, 1, reinterpret_cast<float *>(&light_direction));
+    
+            glBindTexture(GL_TEXTURE_2D, texture);
+    
+            {
+                auto const & mesh = input_model.meshes[lod_level];
+                glBindVertexArray(vaos[lod_level]);
+                glDrawElementsInstanced(GL_TRIANGLES, mesh.indices.count, mesh.indices.type, reinterpret_cast<void *>(mesh.indices.view.offset), instancies[lod_level].size());
+            }
         }
 
         { // Work with queries
@@ -411,7 +417,16 @@ int main() try
                         freeObjects[i] = true;
                         queryObjects[i] = 0;
 
-                        std::cout << result / 1e6 << " ms, " << 1e9 / result << " fps, " << instancies.size() << " inst" << std::endl;
+                        std::cout << 
+                            result / 1e6 << " ms, " << 
+                            1e9 / result << " fps, " << 
+                            instancies[0].size() << "/" <<
+                            instancies[1].size() << "/" <<
+                            instancies[2].size() << "/" <<
+                            instancies[3].size() << "/" <<
+                            instancies[4].size() << "/" <<
+                            instancies[5].size() << " inst" << 
+                            std::endl;
                     }
                 }
             }
