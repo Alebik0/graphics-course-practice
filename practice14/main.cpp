@@ -346,30 +346,35 @@ int main() try
         float near = 0.1f;
         float far = 100.f;
 
-        glm::mat4 model(1.f);
+        for (int x = -16; x < 16; x++) {
+            for (int y = -16; y < 16; y++) {
+                glm::mat4 model(1.f);
+                model = glm::translate(model, glm::vec3((float) x, 0.f, (float) y));
 
-        glm::mat4 view(1.f);
-        view = glm::rotate(view, camera_rotation, {0.f, 1.f, 0.f});
-        view = glm::translate(view, -camera_position);
-
-        glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, (1.f * width) / height, near, far);
-
-        glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
-
-        glm::vec3 light_direction = glm::normalize(glm::vec3(1.f, 2.f, 3.f));
-
-        glUseProgram(program);
-        glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-        glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
-        glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
-        glUniform3fv(light_direction_location, 1, reinterpret_cast<float *>(&light_direction));
-
-        glBindTexture(GL_TEXTURE_2D, texture);
-
-        {
-            auto const & mesh = input_model.meshes[0];
-            glBindVertexArray(vaos[0]);
-            glDrawElements(GL_TRIANGLES, mesh.indices.count, mesh.indices.type, reinterpret_cast<void *>(mesh.indices.view.offset));
+                glm::mat4 view(1.f);
+                view = glm::rotate(view, camera_rotation, {0.f, 1.f, 0.f});
+                view = glm::translate(view, -camera_position);
+        
+                glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, (1.f * width) / height, near, far);
+        
+                glm::vec3 camera_position = (glm::inverse(view) * glm::vec4(0.f, 0.f, 0.f, 1.f)).xyz();
+        
+                glm::vec3 light_direction = glm::normalize(glm::vec3(1.f, 2.f, 3.f));
+        
+                glUseProgram(program);
+                glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
+                glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
+                glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+                glUniform3fv(light_direction_location, 1, reinterpret_cast<float *>(&light_direction));
+        
+                glBindTexture(GL_TEXTURE_2D, texture);
+        
+                {
+                    auto const & mesh = input_model.meshes[0];
+                    glBindVertexArray(vaos[0]);
+                    glDrawElements(GL_TRIANGLES, mesh.indices.count, mesh.indices.type, reinterpret_cast<void *>(mesh.indices.view.offset));
+                }
+            }
         }
 
         { // Work with queries
@@ -385,7 +390,7 @@ int main() try
                         freeObjects[i] = true;
                         queryObjects[i] = 0;
 
-                        std::cout << (float) result / 1000 << " ms, " << 1000000.f / result << " fps" << std::endl;
+                        std::cout << (float) result / 1e6 << " ms, " << (float) 1e9 / result << " fps" << std::endl;
                     }
                 }
             }
