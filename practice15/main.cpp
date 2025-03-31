@@ -78,7 +78,8 @@ void main()
 {
     float textureValue = median(texture(sdf_texture, texcoord).rgb);
     float sdfValue = sdf_scale * (textureValue - 0.5);
-    float alpha = smoothstep(-0.5, 0.5, sdfValue);
+    float smoothValue = length(vec2(dFdx(sdfValue), dFdy(sdfValue))) / sqrt(2.0);
+    float alpha = smoothstep(-smoothValue, smoothValue, sdfValue);
     vec3 textColor = vec3(0.f);
     out_color = vec4(textColor, alpha);
 }
@@ -321,9 +322,10 @@ int main() try
         last_frame_start = now;
 
         glm::mat4 transform(1.f);
-        transform = glm::translate(transform, glm::vec3(-1.f, 1.f, 0.f)); // [0, 2] -> [-1, 1]
-        transform = glm::scale(transform, glm::vec3(2.f / width, -2.f / height, 1.f));
-        transform = glm::translate(transform, glm::vec3(0.5f * (glm::vec2(width, height) - bbox_max + bbox_min), 0.f)); // [bbox_min, bbox_max] -> [width / 2, height / 2]
+        transform = glm::scale(transform, glm::vec3(5.f)); // Scale x5
+        transform = glm::translate(transform, glm::vec3(-1.f, 1.f, 0.f)); // Translate to GL coords
+        transform = glm::scale(transform, glm::vec3(2.f / width, -2.f / height, 1.f)); // Scale to GL coords
+        transform = glm::translate(transform, glm::vec3(0.5f * (glm::vec2(width, height) - bbox_max + bbox_min), 0.f)); // Center
 
         glClearColor(0.8f, 0.8f, 1.f, 0.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
