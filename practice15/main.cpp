@@ -79,9 +79,22 @@ void main()
     float textureValue = median(texture(sdf_texture, texcoord).rgb);
     float sdfValue = sdf_scale * (textureValue - 0.5);
     float smoothValue = length(vec2(dFdx(sdfValue), dFdy(sdfValue))) / sqrt(2.0);
-    float alpha = smoothstep(-smoothValue, smoothValue, sdfValue);
+    float borderSize = 0.75;
+    float alpha = smoothstep(-smoothValue, smoothValue, sdfValue + borderSize);
     vec3 textColor = vec3(0.f);
-    out_color = vec4(textColor, alpha);
+    vec3 borderColor = vec3(1.f);
+    vec3 color;
+
+    if (sdfValue < -smoothValue) {
+        color = borderColor;
+    } else if (sdfValue > smoothValue) {
+        color = textColor;
+    } else {
+        float mix_power = smoothstep(-smoothValue, smoothValue, sdfValue);
+        color = mix(borderColor, textColor, mix_power);
+    }
+
+    out_color = vec4(color, alpha);
 }
 )";
 
