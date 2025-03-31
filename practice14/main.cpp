@@ -140,7 +140,7 @@ int main() try
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 16);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
@@ -233,6 +233,10 @@ int main() try
         stbi_image_free(data);
     }
 
+    std::vector<GLuint> queryObjects;
+    std::vector<bool> freeObjects;
+    unsigned int querySize = 0;
+
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
     float time = 0.f;
@@ -281,6 +285,32 @@ int main() try
         if (!paused)
             time += dt;
 
+        unsigned int frameQueryIndex;
+        { // Work with queries
+            int queryIndex = -1;
+            for (unsigned int i = 0; i < querySize; i++) {
+                if (freeObjects[i]) {
+                    queryIndex = i;
+                    break;
+                }
+            }
+            
+            if (queryIndex == -1) {
+                queryIndex = querySize;
+                queryObjects.push_back(0);
+                freeObjects.push_back(true);
+                querySize++;
+            }
+
+            glGenQueries(1, &queryObjects[queryIndex]);
+            freeObjects[queryIndex] = false;
+
+            glBeginQuery(GL_TIME_ELAPSED, queryObjects[queryIndex]);
+
+            frameQueryIndex = queryIndex;
+        }
+
+        // Frame:
         float camera_move_forward = 0.f;
         float camera_move_sideways = 0.f;
 
@@ -340,6 +370,25 @@ int main() try
             auto const & mesh = input_model.meshes[0];
             glBindVertexArray(vaos[0]);
             glDrawElements(GL_TRIANGLES, mesh.indices.count, mesh.indices.type, reinterpret_cast<void *>(mesh.indices.view.offset));
+        }
+
+        { // Work with queries
+            glEndQuery(GL_TIME_ELAPSED);
+
+            for (unsigned int i = 0; i < querySize; i++) {
+                if (!freeObjects[i]) {
+                    GLint result;
+                    glGetQueryObjectiv(queryObjects[i], GL_QUERY_RESULT_AVAILABLE, &result);
+
+                    if (result == GL_TRUE) {
+                        glGetQueryObjectiv(queryObjects[i], GL_QUERY_RESULT, &result);
+                        freeObjects[i] = true;
+                        queryObjects[i] = 0;
+
+                        std::cout << (float) result / 1000 << " ms, " << 1000000.f / result << " fps" << std::endl;
+                    }
+                }
+            }
         }
 
         SDL_GL_SwapWindow(window);
