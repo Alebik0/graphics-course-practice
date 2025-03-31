@@ -63,13 +63,24 @@ void main()
 const char msdf_fragment_shader_source[] =
 R"(#version 330 core
 
+uniform float sdf_scale;
+uniform sampler2D sdf_texture;
+
 layout (location = 0) out vec4 out_color;
 
 in vec2 texcoord;
 
+float median(vec3 v) {
+    return max(min(v.r, v.g), min(max(v.r, v.g), v.b));
+}
+
 void main()
 {
-    out_color = vec4(texcoord, 0.0, 1.0);
+    float textureValue = median(texture(sdf_texture, texcoord).rgb);
+    float sdfValue = sdf_scale * (textureValue - 0.5);
+    float alpha = smoothstep(-0.5, 0.5, sdfValue);
+    vec3 textColor = vec3(0.f);
+    out_color = vec4(textColor, alpha);
 }
 )";
 
@@ -153,6 +164,8 @@ int main() try
     auto msdf_program = create_program(msdf_vertex_shader, msdf_fragment_shader);
 
     GLuint transform_location = glGetUniformLocation(msdf_program, "transform");
+    GLuint sdf_scale_location = glGetUniformLocation(msdf_program, "sdf_scale");
+    
 
     const std::string project_root = PROJECT_ROOT;
     const std::string font_path = project_root + "/font/font-msdf.json";
@@ -302,6 +315,7 @@ int main() try
         glUseProgram(msdf_program);
 
         glUniformMatrix4fv(transform_location, 1, GL_FALSE, reinterpret_cast<float *>(&transform));
+        glUniform1f(sdf_scale_location, font.sdf_scale);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
