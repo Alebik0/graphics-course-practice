@@ -193,25 +193,6 @@ int main() try
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), reinterpret_cast<void *>(0));
     }
 
-    { // Put some data to vbo
-        std::vector<glm::vec2> positions = {
-            glm::vec2(0, 0),
-            glm::vec2(100, 0),
-            glm::vec2(0, 100)
-        };
-        std::vector<glm::vec2> texcoords = {
-            glm::vec2(0, 0),
-            glm::vec2(1, 0),
-            glm::vec2(0, 1)
-        };
-        
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_position);
-        glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(glm::vec2), positions.data(), GL_STATIC_DRAW);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_texcoord);
-        glBufferData(GL_ARRAY_BUFFER, texcoords.size() * sizeof(glm::vec2), texcoords.data(), GL_STATIC_DRAW);
-    }
-
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
     float time = 0.f;
@@ -224,6 +205,10 @@ int main() try
     bool text_changed = true;
 
     bool running = true;
+
+    std::vector<glm::vec2> positions;
+    std::vector<glm::vec2> texcoords;
+
     while (running)
     {
         for (SDL_Event event; SDL_PollEvent(&event);) switch (event.type)
@@ -259,6 +244,47 @@ int main() try
         if (!running)
             break;
 
+        if (text_changed) { // Put some data to vbo
+            positions.clear();
+            texcoords.clear();
+            glm::vec2 pen(0.f);
+
+            for (char c : text) {
+                msdf_font::glyph c_glyph = font.glyphs.at(c);
+                glm::vec2 tl = pen + glm::vec2(c_glyph.xoffset, c_glyph.yoffset);
+                glm::vec2 br = pen + glm::vec2(c_glyph.xoffset, c_glyph.yoffset) + glm::vec2(c_glyph.width, c_glyph.height);
+                glm::vec2 tr = glm::vec2(br.x, tl.y);
+                glm::vec2 bl = glm::vec2(tl.x, br.y);
+                glm::vec2 tl_tc = glm::vec2(c_glyph.x, c_glyph.y) / glm::vec2(texture_width, texture_height);
+                glm::vec2 br_tc = (glm::vec2(c_glyph.x, c_glyph.y) + glm::vec2(c_glyph.width, c_glyph.height)) / glm::vec2(texture_width, texture_height);
+                glm::vec2 tr_tc = glm::vec2(br_tc.x, tl_tc.y);
+                glm::vec2 bl_tc = glm::vec2(tl_tc.x, br_tc.y);
+
+                positions.push_back(tl);
+                texcoords.push_back(tl_tc);
+                positions.push_back(bl);
+                texcoords.push_back(bl_tc);
+                positions.push_back(tr);
+                texcoords.push_back(tr_tc);
+                positions.push_back(tr);
+                texcoords.push_back(tr_tc);
+                positions.push_back(bl);
+                texcoords.push_back(bl_tc);
+                positions.push_back(br);
+                texcoords.push_back(br_tc);
+
+                pen.x += c_glyph.advance;
+            }
+            
+            glBindBuffer(GL_ARRAY_BUFFER, vbo_position);
+            glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(glm::vec2), positions.data(), GL_STATIC_DRAW);
+            
+            glBindBuffer(GL_ARRAY_BUFFER, vbo_texcoord);
+            glBufferData(GL_ARRAY_BUFFER, texcoords.size() * sizeof(glm::vec2), texcoords.data(), GL_STATIC_DRAW);
+            
+            text_changed = false;
+        }
+
         auto now = std::chrono::high_resolution_clock::now();
         float dt = std::chrono::duration_cast<std::chrono::duration<float>>(now - last_frame_start).count();
         last_frame_start = now;
@@ -281,7 +307,7 @@ int main() try
         glBindTexture(GL_TEXTURE_2D, texture);
 
         glBindVertexArray(vao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawArrays(GL_TRIANGLES, 0, positions.size());
 
         SDL_GL_SwapWindow(window);
     }
