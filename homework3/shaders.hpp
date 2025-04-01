@@ -65,7 +65,9 @@ uniform float roughness;
 
 uniform sampler2D albedoTexture;
 uniform sampler2D alphaTexture;
-uniform float hasAlphaTexture;
+uniform float has_alpha;
+uniform sampler2D bumpTexture;
+uniform float has_bump;
 
 uniform sampler2DShadow shadowmapTexture;
 uniform mat4 shadowmap_projection;
@@ -96,7 +98,7 @@ float LinearizeDepth(float depth)
 
 void main()
 {
-    if (hasAlphaTexture > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
+    if (has_alpha > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
         discard;
 
     albedo = texture(albedoTexture, texcoord).rgb;
@@ -160,7 +162,9 @@ void main()
 
     GLuint albedoTexture_location;
     GLuint alphaTexture_location;
-    GLuint hasAlphaTexture_location;
+    GLuint has_alpha_location;
+    GLuint bumpTexture_location;
+    GLuint has_bump_location;
 
     GLuint shadowmapTexture_location;
     GLuint shadowmap_projection_location;
@@ -237,7 +241,9 @@ public:
         roughness_location = glGetUniformLocation(program, "roughness");
         albedoTexture_location = glGetUniformLocation(program, "albedoTexture");
         alphaTexture_location = glGetUniformLocation(program, "alphaTexture");
-        hasAlphaTexture_location = glGetUniformLocation(program, "hasAlphaTexture");
+        has_alpha_location = glGetUniformLocation(program, "has_alpha");
+        bumpTexture_location = glGetUniformLocation(program, "bumpTexture");
+        has_bump_location = glGetUniformLocation(program, "has_bump");
         shadowmapTexture_location = glGetUniformLocation(program, "shadowmapTexture");
         shadowmap_projection_location = glGetUniformLocation(program, "shadowmap_projection");
 
@@ -306,9 +312,18 @@ public:
                     glActiveTexture(GL_TEXTURE1);
                     glBindTexture(GL_TEXTURE_2D, face.alpha_texture);
                     glUniform1i(alphaTexture_location, 1);
-                    glUniform1f(hasAlphaTexture_location, 1.0f);
+                    glUniform1f(has_alpha_location, 1.0f);
                 } else {
-                    glUniform1f(hasAlphaTexture_location, 0.0f);
+                    glUniform1f(has_alpha_location, 0.0f);
+                }
+
+                if (face.bump_texture != 0) {
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, face.bump_texture);
+                    glUniform1i(bumpTexture_location, 1);
+                    glUniform1f(has_bump_location, 1.0f);
+                } else {
+                    glUniform1f(has_bump_location, 0.0f);
                 }
 
                 glUniform3f(glossiness_location, face.glossiness[0], face.glossiness[1], face.glossiness[2]);

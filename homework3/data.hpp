@@ -39,7 +39,7 @@ public:
         right_direction = glm::vec3(1.f, 0.f, 0.f);
         up_direction = glm::vec3(0.f, 1.f, 0.f);
 
-        position = glm::vec3(1000.f, 125.f, 0.f);
+        position = glm::vec3(1100.f, 125.f, 200.f);
         angle = glm::pi<float>();
     }
 
@@ -106,10 +106,12 @@ struct obj_data
         std::string material_name;
         std::string albedo_texname;             // TinyObj -> ambient_texname
         std::string alpha_texname;              // TinyObj -> alpha_texname
+        std::string bump_texname;               // TinyObj -> bump_texname
         std::array<float, 3> glossiness;        // TinyObj -> specular
         float power;                            // TinyObj -> shininess
         GLuint albedo_texture;
         GLuint alpha_texture;
+        GLuint bump_texture;
     };
 
     std::vector<vertex> vertices;

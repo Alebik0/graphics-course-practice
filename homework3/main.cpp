@@ -193,7 +193,7 @@ int main() try
         }
 
         SunLight sun = { UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f), SUN_COLOR };
-        PointLight light = { LIGHT_POSITION + LIGHT_DELTA * std::sin(time * 0.2f), LIGHT_COLOR, LIGHT_ATTENUATION };
+        PointLight light = { LIGHT_POSITION, LIGHT_COLOR, LIGHT_ATTENUATION };
 
         glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun.direction);
 
