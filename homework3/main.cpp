@@ -132,30 +132,6 @@ int main() try
     Camera camera = Camera();
     SourceShader sourceShader = SourceShader();
     ShadowmapShader shadowmapShader = ShadowmapShader();
-    glm::vec3 lightDirection[6] = {
-        glm::vec3(-1.f,  0.f,  0.f),
-        glm::vec3( 1.f,  0.f,  0.f),
-        glm::vec3( 0.f, -1.f,  0.f),
-        glm::vec3( 0.f,  1.f,  0.f),
-        glm::vec3( 0.f,  0.f, -1.f),
-        glm::vec3( 0.f,  0.f,  1.f)
-    };
-    glm::vec3 lightUpDirection[6] = {
-        glm::vec3( 0.f,  1.f,  0.f),
-        glm::vec3( 0.f,  1.f,  0.f),
-        glm::vec3( 0.f,  0.f,  1.f),
-        glm::vec3( 0.f,  0.f,  1.f),
-        glm::vec3( 0.f,  1.f,  0.f),
-        glm::vec3( 0.f,  1.f,  0.f)
-    };
-    PointShadowmapShader lightShadowmap[6] = {
-        PointShadowmapShader(),
-        PointShadowmapShader(),
-        PointShadowmapShader(),
-        PointShadowmapShader(),
-        PointShadowmapShader(),
-        PointShadowmapShader()
-    };
     DebugShader debugShader = DebugShader();
     sourceShader.UpdateBufferData(scene);
 
@@ -221,18 +197,6 @@ int main() try
 
         glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun.direction);
 
-        glm::mat4 projections[6];
-
-        for (int i = 0; i < 6; i++) {
-            projections[i] = glm::perspective(glm::pi<float>() / 2, 1.f, 0.1f, 1000.f) *
-                glm::lookAt(light.position, light.position + lightDirection[i], lightUpDirection[i]);
-        }
-        
-        for (int i = 0; i < 6; i++) {
-            lightShadowmap[i].projection = projections[i];
-            lightShadowmap[i].Draw(sourceShader, scene);
-        }
-
         { // Draw shadowmap
             shadowmapShader.projection = shadowmap_projection;
             shadowmapShader.Draw(sourceShader, scene);
@@ -255,11 +219,6 @@ int main() try
             sourceShader.light = light;
             sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
             sourceShader.shadowmap_projection = shadowmap_projection;
-
-            for (int i = 0; i < 6; i++) {
-                sourceShader.lightShadowmapTexture[i] = lightShadowmap[i].shadowmapTexture;
-                sourceShader.light_shadowmap_projection[i] = projections[i];
-            }
 
             sourceShader.Draw(settings, camera, scene);
         }

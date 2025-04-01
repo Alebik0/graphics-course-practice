@@ -70,9 +70,6 @@ uniform float hasAlphaTexture;
 uniform sampler2DShadow shadowmapTexture;
 uniform mat4 shadowmap_projection;
 
-uniform sampler2DShadow lightShadowmapTexture[6];
-uniform mat4 light_shadowmap_projection[6];
-
 in vec3 position;
 in vec3 normal;
 in vec2 texcoord;
@@ -137,51 +134,7 @@ void main()
     float light_attenuation = 1.0 / divider;
     vec3 light_vector = normalize(position - point_light_position);
     vec3 light_color = (diffuse(-light_vector) + specular(-light_vector)) * light_attenuation * point_light_color;
-    
-    for (int i = 0; i < 6; i++) { // Add light color
-        mat4 projection = light_shadowmap_projection[i];
-        
-        vec4 ndc = projection * vec4(position, 1.0);
-        vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
-        
-        if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
-            shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
-
-            float sum = 0.0;
-            float sum_w = 0.0;
-            const int N = 5;
-            float radius = 7.0;
-            for (int x = -N; x <= N; x += 1) {
-                for (int y = -N; y <= N; y += 1) {
-                    float c = exp(-float(x * x + y * y) / (radius*radius));
-                    sum_w += c;
-
-                    switch (i) {
-                    case 0:
-                        sum += c * texture(lightShadowmapTexture[0], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[0], 0), 1.0));
-                        break;
-                    case 1:
-                        sum += c * texture(lightShadowmapTexture[1], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[1], 0), 1.0));
-                        break;
-                    case 2:
-                        sum += c * texture(lightShadowmapTexture[2], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[2], 0), 1.0));
-                        break;
-                    case 3:
-                        sum += c * texture(lightShadowmapTexture[3], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[3], 0), 1.0));
-                        break;
-                    case 4:
-                        sum += c * texture(lightShadowmapTexture[4], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[4], 0), 1.0));
-                        break;
-                    case 5:
-                        sum += c * texture(lightShadowmapTexture[5], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[5], 0), 1.0));
-                        break;
-                    }
-                }
-            }
-    
-            color += sum / sum_w * light_color;
-        }
-    }
+    color += light_color;
 
     out_color = vec4(color, 1.0);
 }
@@ -211,9 +164,6 @@ void main()
 
     GLuint shadowmapTexture_location;
     GLuint shadowmap_projection_location;
-
-    GLuint lightShadowmapTexture_location;
-    GLuint light_shadowmap_projection_location;
 
     static GLuint create_shader(GLenum type, const char * source)
     {
@@ -268,9 +218,6 @@ public:
     GLuint shadowmapTexture;
     glm::mat4 shadowmap_projection;
     
-    GLuint lightShadowmapTexture[6];
-    glm::mat4 light_shadowmap_projection[6];
-
     SourceShader() {
         // Init program:
         GLuint source_vertex_shader = SourceShader::create_shader(GL_VERTEX_SHADER, vertex_shader_source);
@@ -293,8 +240,6 @@ public:
         hasAlphaTexture_location = glGetUniformLocation(program, "hasAlphaTexture");
         shadowmapTexture_location = glGetUniformLocation(program, "shadowmapTexture");
         shadowmap_projection_location = glGetUniformLocation(program, "shadowmap_projection");
-        lightShadowmapTexture_location = glGetUniformLocation(program, "lightShadowmapTexture");
-        light_shadowmap_projection_location = glGetUniformLocation(program, "light_shadowmap_projection");
 
         // Init vao
         glGenVertexArrays(1, &vao);
@@ -348,15 +293,6 @@ public:
         glBindTexture(GL_TEXTURE_2D, shadowmapTexture);
         glUniform1i(shadowmapTexture_location, 2);
         glUniformMatrix4fv(shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
-        
-        for (int i = 0; i < 6; i++) {
-            glActiveTexture(GL_TEXTURE3 + i);
-            glBindTexture(GL_TEXTURE_2D, lightShadowmapTexture[i]);
-        }
-
-        GLint textureIndicies[6] = { 3, 4, 5, 6, 7, 8 };
-        glUniform1iv(lightShadowmapTexture_location, 6, textureIndicies);
-        glUniformMatrix4fv(light_shadowmap_projection_location, 6, GL_FALSE, reinterpret_cast<float *>(&light_shadowmap_projection));
         
         { // Draw full scene
             glBindVertexArray(vao);
@@ -490,133 +426,6 @@ public:
     ) {
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, shadowmap_fbo);
         glViewport(0, 0, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION);
-        glClear(GL_DEPTH_BUFFER_BIT);
-
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_FRONT);
-
-        glUseProgram(program);
-
-        glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
-
-        { // Draw full scene
-            glBindVertexArray(sourceShader.vao);
-
-            for (obj_data::face_data face : scene.faces) {
-                glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
-            }
-        }
-    }
-};
-
-
-class PointShadowmapShader {
-private:
-    static inline char shadowmap_vertex_shader[] =
-R"(#version 330 core
-
-layout (location = 0) in vec3 in_position;
-
-uniform mat4 projection;
-
-void main()
-{
-    gl_Position = projection * vec4(in_position, 1.0);
-}
-)";
-    
-    static inline char shadowmap_fragment_shader[] =
-R"(#version 330 core
-
-void main()
-{
-}
-)";
-
-    GLuint program;
-    
-    GLuint projection_location;
-
-    GLuint shadowmap_fbo;
-
-    static GLuint create_shader(GLenum type, const char * source)
-    {
-        GLuint result = glCreateShader(type);
-        glShaderSource(result, 1, &source, nullptr);
-        glCompileShader(result);
-        GLint status;
-        glGetShaderiv(result, GL_COMPILE_STATUS, &status);
-        if (status != GL_TRUE)
-        {
-            GLint info_log_length;
-            glGetShaderiv(result, GL_INFO_LOG_LENGTH, &info_log_length);
-            std::string info_log(info_log_length, '\0');
-            glGetShaderInfoLog(result, info_log.size(), nullptr, info_log.data());
-            throw std::runtime_error("Shader compilation failed: " + info_log);
-        }
-        return result;
-    }
-
-    static GLuint create_program(GLuint vertex_shader, GLuint fragment_shader)
-    {
-        GLuint result = glCreateProgram();
-        glAttachShader(result, vertex_shader);
-        glAttachShader(result, fragment_shader);
-        glLinkProgram(result);
-
-        GLint status;
-        glGetProgramiv(result, GL_LINK_STATUS, &status);
-        if (status != GL_TRUE)
-        {
-            GLint info_log_length;
-            glGetProgramiv(result, GL_INFO_LOG_LENGTH, &info_log_length);
-            std::string info_log(info_log_length, '\0');
-            glGetProgramInfoLog(result, info_log.size(), nullptr, info_log.data());
-            throw std::runtime_error("Program linkage failed: " + info_log);
-        }
-
-        return result;
-    }
-public:
-    GLuint shadowmapTexture;
-
-    glm::mat4 projection;
-
-    PointShadowmapShader() {
-        // Init program:
-        GLuint shadowmap_vertex_shader = create_shader(GL_VERTEX_SHADER, PointShadowmapShader::shadowmap_vertex_shader);
-        GLuint shadowmap_fragment_shader = create_shader(GL_FRAGMENT_SHADER, PointShadowmapShader::shadowmap_fragment_shader);
-        program = create_program(shadowmap_vertex_shader, shadowmap_fragment_shader);
-        
-        projection_location = glGetUniformLocation(program, "projection");
-
-        // Make textures:
-        glGenTextures(1, &shadowmapTexture);
-        glBindTexture(GL_TEXTURE_2D, shadowmapTexture);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, LIGHT_SHADOWMAP_RESOLUTION, LIGHT_SHADOWMAP_RESOLUTION, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-
-        // Make framebuffers:
-        glGenFramebuffers(1, &shadowmap_fbo);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, shadowmap_fbo);
-        glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowmapTexture, 0);
-
-        if (glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            throw std::runtime_error("Incomplete framebuffer!");
-    }
-
-    void Draw(
-        const SourceShader & sourceShader,
-        const obj_data & scene
-    ) {
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, shadowmap_fbo);
-        glViewport(0, 0, LIGHT_SHADOWMAP_RESOLUTION, LIGHT_SHADOWMAP_RESOLUTION);
         glClear(GL_DEPTH_BUFFER_BIT);
 
         glEnable(GL_DEPTH_TEST);
