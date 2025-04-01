@@ -264,12 +264,6 @@ int main() try
             sourceShader.Draw(settings, camera, scene);
         }
 
-        { // Draw debug
-            debugShader.shadowmapTexture = lightShadowmap[2].shadowmapTexture;
-            debugShader.Draw();
-        }
-        
-
         SDL_GL_SwapWindow(window);
     }
 

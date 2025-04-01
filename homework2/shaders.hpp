@@ -67,7 +67,7 @@ uniform sampler2D albedoTexture;
 uniform sampler2D alphaTexture;
 uniform float hasAlphaTexture;
 
-uniform sampler2D shadowmapTexture;
+uniform sampler2DShadow shadowmapTexture;
 uniform mat4 shadowmap_projection;
 
 uniform sampler2DShadow lightShadowmapTexture[6];
@@ -114,15 +114,21 @@ void main()
         vec4 ndc = shadowmap_projection * vec4(position, 1.0);
         
         if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
-            vec2 shadowmap_texcoord = ndc.xy * 0.5 + 0.5;
-            float shadow_depth = ndc.z * 0.5 + 0.5;
-
-            if (texture(shadowmapTexture, shadowmap_texcoord).r < shadow_depth) {
-            } else {
-                color += sun_color;
+            vec3 shadowmap_texcoord = ndc.xyz * 0.5 + 0.5;
+            
+            float sum = 0.0;
+            float sum_w = 0.0;
+            const int N = 5;
+            float radius = 7.0;
+            for (int x = -N; x <= N; x += 1) {
+                for (int y = -N; y <= N; y += 1) {
+                    float c = exp(-float(x * x + y * y) / (radius*radius));
+                    sum_w += c;
+                    sum += c * texture(shadowmapTexture, shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(shadowmapTexture, 0), 1.0));
+                }
             }
-        } else {
-            color += sun_color;
+    
+            color += sum / sum_w * sun_color;
         }
     }  
     
@@ -140,7 +146,6 @@ void main()
         
         if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
             shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
-
 
             float sum = 0.0;
             float sum_w = 0.0;
@@ -408,7 +413,6 @@ void main()
     
     GLuint projection_location;
 
-    GLuint shadowmap_rbo;
     GLuint shadowmap_fbo;
 
     static GLuint create_shader(GLenum type, const char * source)
@@ -465,17 +469,13 @@ public:
         // Make textures:
         glGenTextures(1, &shadowmapTexture);
         glBindTexture(GL_TEXTURE_2D, shadowmapTexture);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 
         // Make framebuffers:
-        glGenRenderbuffers(1, &shadowmap_rbo);
-        glBindRenderbuffer(GL_RENDERBUFFER, shadowmap_rbo);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION);
-
         glGenFramebuffers(1, &shadowmap_fbo);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, shadowmap_fbo);
         glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowmapTexture, 0);
@@ -538,7 +538,6 @@ void main()
     
     GLuint projection_location;
 
-    GLuint shadowmap_rbo;
     GLuint shadowmap_fbo;
 
     static GLuint create_shader(GLenum type, const char * source)
@@ -604,10 +603,6 @@ public:
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, LIGHT_SHADOWMAP_RESOLUTION, LIGHT_SHADOWMAP_RESOLUTION, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 
         // Make framebuffers:
-        glGenRenderbuffers(1, &shadowmap_rbo);
-        glBindRenderbuffer(GL_RENDERBUFFER, shadowmap_rbo);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, LIGHT_SHADOWMAP_RESOLUTION, LIGHT_SHADOWMAP_RESOLUTION);
-
         glGenFramebuffers(1, &shadowmap_fbo);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, shadowmap_fbo);
         glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowmapTexture, 0);
