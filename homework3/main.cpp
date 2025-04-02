@@ -240,26 +240,18 @@ int main() try
         }
 
         { // Draw reflections
-            glm::vec3 reflection_position = (bunny_model * glm::vec4(bunny_center, 1.f)).xyz();
-            glm::vec3 directions[6] = {
-                glm::vec3( 1.f,  0.f,  0.f),
-                glm::vec3(-1.f,  0.f,  0.f),
-                glm::vec3( 0.f,  1.f,  0.f),
-                glm::vec3( 0.f, -1.f,  0.f),
-                glm::vec3( 0.f,  0.f,  1.f),
-                glm::vec3( 0.f,  0.f, -1.f)
-            };
-            glm::vec3 up_directions[6] = {
-                glm::vec3(0.f, -1.f,  0.f),
-                glm::vec3(0.f, -1.f,  0.f),
-                glm::vec3(0.f,  0.f,  1.f),
-                glm::vec3(0.f,  0.f, -1.f),
-                glm::vec3(0.f, -1.f,  0.f),
-                glm::vec3(0.f, -1.f,  0.f)
+            glm::vec3 reflection_position = glm::vec3(bunny_model * glm::vec4(bunny_center, 1.f));
+            glm::mat4 views[6] = {
+                glm::lookAt(reflection_position, reflection_position + glm::vec3( 1.f,  0.f,  0.f), glm::vec3(0.f, -1.f,  0.f)),
+                glm::lookAt(reflection_position, reflection_position + glm::vec3(-1.f,  0.f,  0.f), glm::vec3(0.f, -1.f,  0.f)),
+                glm::lookAt(reflection_position, reflection_position + glm::vec3( 0.f,  1.f,  0.f), glm::vec3(0.f,  0.f,  1.f)),
+                glm::lookAt(reflection_position, reflection_position + glm::vec3( 0.f, -1.f,  0.f), glm::vec3(0.f,  0.f, -1.f)),
+                glm::lookAt(reflection_position, reflection_position + glm::vec3( 0.f,  0.f,  1.f), glm::vec3(0.f, -1.f,  0.f)),
+                glm::lookAt(reflection_position, reflection_position + glm::vec3( 0.f,  0.f, -1.f), glm::vec3(0.f, -1.f,  0.f))
             };
 
-            for (int i = 0; i < 6; i++) {
-                {
+            for (int i = 0; i < 6; i++) { // Draw reflection cubemap
+                { // Clear frame
                     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, bunnyShader.bunny_reflection_fbo[i]);
                     
                     glClearColor(settings.clear_r, settings.clear_g, settings.clear_b, 1.0f);
@@ -272,15 +264,12 @@ int main() try
                     glCullFace(GL_BACK);
                 }
 
-                {
+                { // Draw scene
                     Camera camera = Camera();
                     camera.position = reflection_position;
     
-                    glm::mat4 model(1.f);
-    
-                    glm::mat4 view(1.f);
-                    view = glm::lookAt(reflection_position, reflection_position + directions[i], up_directions[i]);
-        
+                    glm::mat4 model      = glm::mat4(1.f);
+                    glm::mat4 view       = views[i];
                     glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, 1.f, settings.near, settings.far);
         
                     sourceShader.model = model;
@@ -302,7 +291,7 @@ int main() try
         }
 
         { // Draw source
-            {
+            { // Clear frame
                 glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
                 glClearColor(settings.clear_r, settings.clear_g, settings.clear_b, 1.0f);
@@ -315,7 +304,7 @@ int main() try
                 glCullFace(GL_BACK);
             }
 
-            {
+            { // Draw scene
                 glm::mat4 model(1.f);
 
                 glm::mat4 view(1.f);
@@ -340,7 +329,7 @@ int main() try
                 sourceShader.Draw(settings, camera, scene);
             }
 
-            {
+            { // Draw bunny
                 glm::mat4 model = bunny_model;
 
                 glm::mat4 view(1.f);
