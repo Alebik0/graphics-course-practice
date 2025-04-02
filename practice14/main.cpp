@@ -415,7 +415,6 @@ int main() try
                     if (result == GL_TRUE) {
                         glGetQueryObjectiv(queryObjects[i], GL_QUERY_RESULT, &result);
                         freeObjects[i] = true;
-                        queryObjects[i] = 0;
 
                         std::cout << 
                             result / 1e6 << " ms, " << 
