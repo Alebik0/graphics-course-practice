@@ -179,6 +179,12 @@ int main() try
             if (button_down[SDLK_s]) {
                 camera.MoveBackward(dt);
             }
+            if (button_down[SDLK_LSHIFT]) {
+                camera.MoveUpward(dt);
+            }
+            if (button_down[SDLK_LCTRL]) {
+                camera.MoveDownward(dt);
+            }
             if (button_down[SDLK_LEFT]) {
                 camera.RotateLeft(dt);
             }
@@ -200,7 +206,7 @@ int main() try
             }
         }
 
-        SunLight sun = { UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f), SUN_COLOR };
+        SunLight sun = { UP + RGH * std::sin(time * 0.3f) + FWD * 0.5f, SUN_COLOR };
         PointLight light = { LIGHT_POSITION + LIGHT_DELTA * 0.4f, LIGHT_COLOR, LIGHT_ATTENUATION };
 
         glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun.direction);
