@@ -75,6 +75,7 @@ uniform sampler2DShadow shadowmapTexture;
 uniform mat4 shadowmap_projection;
 
 uniform float has_gamma_correction;
+uniform float has_aces_correction;
 
 in vec3 position;
 in vec3 normal;
@@ -130,6 +131,16 @@ vec3 PerturbNormal(vec3 surf_pos, vec3 surf_norm) {
     return normalize ( abs ( fDet )*vN - vSurfGrad );
 }
 
+vec3 ACESFilm(vec3 x)
+{
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
+}
+
 void main()
 {
     if (has_alpha > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
@@ -183,6 +194,9 @@ void main()
 
     { // Gamma correction:
         float gamma = 2.2;
+
+        if (has_aces_correction > 0.5)
+            color = ACESFilm(color);
         if (has_gamma_correction > 0.5)
             color = pow(color, vec3(1.0 / gamma));
     }
@@ -223,6 +237,7 @@ void main()
     GLuint shadowmap_projection_location;
 
     GLuint has_gamma_correction_location;
+    GLuint has_aces_correction_location;
 
     static GLuint create_shader(GLenum type, const char * source)
     {
@@ -283,6 +298,7 @@ public:
     bool bump_mark;
     bool specular_mark;
     bool gamma_correction_mark;
+    bool aces_correction_mark;
 
     SourceShader() {
         // Init program:
@@ -315,6 +331,7 @@ public:
         shadowmap_projection_location = glGetUniformLocation(program, "shadowmap_projection");
 
         has_gamma_correction_location = glGetUniformLocation(program, "has_gamma_correction");
+        has_aces_correction_location = glGetUniformLocation(program, "has_aces_correction");
 
         // Init vao
         glGenVertexArrays(1, &vao);
@@ -373,6 +390,7 @@ public:
         glUniformMatrix4fv(shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
         
         glUniform1f(has_gamma_correction_location, gamma_correction_mark ? 1.0f : 0.0f);
+        glUniform1f(has_aces_correction_location, aces_correction_mark ? 1.0f : 0.0f);
         
         { // Draw full scene
             glBindVertexArray(vao);

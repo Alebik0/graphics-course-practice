@@ -127,6 +127,7 @@ int main() try
     bool bump_mark = false;
     bool specular_mark = false;
     bool gamma_correction_mark = false;
+    bool aces_correction_mark = false;
     auto last_frame_start = std::chrono::high_resolution_clock::now();
     
     std::map<SDL_Keycode, bool> button_down;
@@ -209,6 +210,10 @@ int main() try
                 gamma_correction_mark = !gamma_correction_mark;
                 button_click[SDLK_3] = false;
             }
+            if (button_click[SDLK_4]) {
+                aces_correction_mark = !aces_correction_mark;
+                button_click[SDLK_4] = false;
+            }
         }
 
         SunLight sun = { UP + RGH * std::sin(time * 0.3f) + FWD * 0.5f, SUN_COLOR };
@@ -242,6 +247,7 @@ int main() try
             sourceShader.bump_mark = bump_mark;
             sourceShader.specular_mark = specular_mark;
             sourceShader.gamma_correction_mark = gamma_correction_mark;
+            sourceShader.aces_correction_mark = aces_correction_mark;
 
             sourceShader.Draw(settings, camera, scene);
         }
