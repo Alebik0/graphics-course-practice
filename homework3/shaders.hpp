@@ -162,20 +162,8 @@ vec3 AddSun(vec3 color) {
             
     if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
         vec3 shadowmap_texcoord = ndc.xyz * 0.5 + 0.5;
-        
-        float sum = 0.0;
-        float sum_w = 0.0;
-        const int N = 5;
-        float radius = 7.0;
-        for (int x = -N; x <= N; x += 1) {
-            for (int y = -N; y <= N; y += 1) {
-                float c = exp(-float(x * x + y * y) / (radius*radius));
-                sum_w += c;
-                sum += c * texture(shadowmapTexture, shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(shadowmapTexture, 0), 1.0));
-            }
-        }
 
-        return color + sum / sum_w * phong(real_normal, sun_direction) * sun_color;
+        return color + texture(shadowmapTexture, shadowmap_texcoord) * phong(real_normal, sun_direction) * sun_color;
     } else {
         return color;
     }
