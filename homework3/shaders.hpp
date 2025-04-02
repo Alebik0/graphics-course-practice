@@ -39,10 +39,10 @@ out vec2 texcoord;
 
 void main()
 {
-    gl_Position = projection * view * model * vec4(in_position, 1.0);
-    position    = (model * vec4(in_position, 1.0)).xyz;
-    normal      = (model * vec4(in_normal, 0.0)).xyz;
+    position    = vec3(model * vec4(in_position, 1.0));
+    normal      = mat3(transpose(inverse(model))) * in_normal;
     texcoord    = in_texcoord;
+    gl_Position = projection * view * vec4(position, 1.0);
 }
 )";
 
@@ -88,8 +88,8 @@ layout (location = 0) out vec4 out_color;
 
 vec3 ReflectionColor() {
     vec3 real_normal = normalize(normal);
-    vec3 view_direction = normalize(camera_position - position);
-    vec3 reflected_direction = 2.0 * real_normal * dot(real_normal, view_direction) - view_direction;
+    vec3 view_direction = normalize(position - camera_position);
+    vec3 reflected_direction = reflect(view_direction, real_normal);
     vec3 color = texture(reflection_texture, reflected_direction).rgb;
 
     return color;
