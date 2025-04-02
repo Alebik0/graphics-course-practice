@@ -39,10 +39,10 @@ out vec2 texcoord;
 
 void main()
 {
-    position = mat3(model) * in_position;
-    gl_Position = projection * view * vec4(position, 1.0);
-    normal = normalize(mat3(model) * in_normal);
-    texcoord = in_texcoord;
+    gl_Position = projection * view * model * vec4(in_position, 1.0);
+    position    = (model * vec4(in_position, 1.0)).xyz;
+    normal      = (model * vec4(in_normal, 0.0)).xyz;
+    texcoord    = in_texcoord;
 }
 )";
 

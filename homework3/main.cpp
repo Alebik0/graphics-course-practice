@@ -236,8 +236,17 @@ int main() try
             shadowmapShader.Draw(sourceShader, scene);
         }
 
+        glm::vec3 bunny_center = (bunny.bbox_min + bunny.bbox_max) / 2.f;
+        glm::mat4 bunny_model(1.f);
+        {
+            bunny_model = glm::translate(bunny_model, glm::vec3(1000.f, 0.f, 0.f) * std::sin(time * 0.05f));
+            bunny_model = glm::translate(bunny_model, glm::vec3(0.f, 75.f, 0.f));
+            bunny_model = glm::scale(bunny_model, glm::vec3(100.f));
+            bunny_model = glm::translate(bunny_model, -bunny_center);
+        }
+
         { // Draw reflections
-            glm::vec3 reflection_position = glm::vec3(0.f);
+            glm::vec3 reflection_position = (bunny_model * glm::vec4(bunny_center, 1.f)).xyz();
             glm::vec3 directions[6] = {
                 glm::vec3( 1.f,  0.f,  0.f),
                 glm::vec3(-1.f,  0.f,  0.f),
@@ -247,12 +256,12 @@ int main() try
                 glm::vec3( 0.f,  0.f, -1.f)
             };
             glm::vec3 up_directions[6] = {
-                glm::vec3(0.f, 1.f, 0.f),
-                glm::vec3(0.f, 1.f, 0.f),
-                glm::vec3(0.f, 0.f, 1.f),
-                glm::vec3(0.f, 0.f, 1.f),
-                glm::vec3(1.f, 0.f, 0.f),
-                glm::vec3(1.f, 0.f, 0.f)
+                glm::vec3(0.f, -1.f,  0.f),
+                glm::vec3(0.f, -1.f,  0.f),
+                glm::vec3(0.f,  0.f,  1.f),
+                glm::vec3(0.f,  0.f, -1.f),
+                glm::vec3(0.f, -1.f,  0.f),
+                glm::vec3(0.f, -1.f,  0.f)
             };
 
             for (int i = 0; i < 6; i++) {
@@ -323,9 +332,7 @@ int main() try
             }
 
             {
-                glm::mat4 model(1.f);
-                model = glm::translate(model, glm::vec3(0.f, 25.f, 0.f));
-                model = glm::scale(model, glm::vec3(100.f));
+                glm::mat4 model = bunny_model;
 
                 glm::mat4 view(1.f);
                 view = glm::rotate(view, camera.angle, UP);
