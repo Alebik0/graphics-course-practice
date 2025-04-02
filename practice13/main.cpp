@@ -404,8 +404,8 @@ int main() try
         const int bones_amount = input_model.bones.size();
         std::vector<glm::mat4x3> bones(bones_amount);
         if (translation.active) {
-            gltf_model::animation old_bones_animation = input_model.animations.at(translation.old_animation);
-            gltf_model::animation new_bones_animation = input_model.animations.at(translation.new_animation);
+            const gltf_model::animation & old_bones_animation = input_model.animations.at(translation.old_animation);
+            const gltf_model::animation & new_bones_animation = input_model.animations.at(translation.new_animation);
             float old_frame_start = std::fmod(translation.current_time, old_bones_animation.max_time);
             float new_frame_start = std::fmod(translation.current_time, new_bones_animation.max_time);
             float delta_time = time - translation.current_time;
