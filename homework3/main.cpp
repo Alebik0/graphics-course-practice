@@ -237,14 +237,32 @@ int main() try
         }
 
         { // Draw reflections
-            {
+            glm::vec3 reflection_position = glm::vec3(0.f);
+            glm::vec3 directions[6] = {
+                glm::vec3( 1.f,  0.f,  0.f),
+                glm::vec3(-1.f,  0.f,  0.f),
+                glm::vec3( 0.f,  1.f,  0.f),
+                glm::vec3( 0.f, -1.f,  0.f),
+                glm::vec3( 0.f,  0.f,  1.f),
+                glm::vec3( 0.f,  0.f, -1.f)
+            };
+            glm::vec3 up_directions[6] = {
+                glm::vec3(0.f, 1.f, 0.f),
+                glm::vec3(0.f, 1.f, 0.f),
+                glm::vec3(0.f, 0.f, 1.f),
+                glm::vec3(0.f, 0.f, 1.f),
+                glm::vec3(1.f, 0.f, 0.f),
+                glm::vec3(1.f, 0.f, 0.f)
+            };
+
+            for (int i = 0; i < 6; i++) {
                 Camera camera = Camera();
-                camera.position = glm::vec3(0.f);
+                camera.position = reflection_position;
 
                 glm::mat4 model(1.f);
 
                 glm::mat4 view(1.f);
-                view = glm::lookAt(glm::vec3(0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
+                view = glm::lookAt(reflection_position, reflection_position + directions[i], up_directions[i]);
     
                 glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, 1.f, settings.near, settings.far);
     
@@ -262,7 +280,7 @@ int main() try
                 sourceShader.gamma_correction_mark = false;
                 sourceShader.aces_correction_mark = false;
 
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sourceShader.bunny_reflection_fbo[0]);
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sourceShader.bunny_reflection_fbo[i]);
                 glClearColor(settings.clear_r, settings.clear_g, settings.clear_b, 1.0f);
                 glViewport(0, 0, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
