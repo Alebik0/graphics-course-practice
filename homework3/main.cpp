@@ -137,17 +137,11 @@ int main() try
 
     Camera camera = Camera();
     SourceShader sourceShader = SourceShader();
+    BunnyShader bunnyShader = BunnyShader();
     ShadowmapShader shadowmapShader = ShadowmapShader();
     DebugShader debugShader = DebugShader();
-    { // Fill vbo
-        std::vector<obj_data::vertex> verticies;
-        for (const auto v : scene.vertices)
-            verticies.push_back(v);
-        for (const auto v : bunny.vertices)
-            verticies.push_back(v);
-            
-        sourceShader.UpdateBufferData(verticies);
-    }
+    sourceShader.UpdateBufferData(scene.vertices);
+    bunnyShader.UpdateBufferData(bunny.vertices);
 
     bool running = true;
     while (running)
@@ -265,45 +259,61 @@ int main() try
             };
 
             for (int i = 0; i < 6; i++) {
-                Camera camera = Camera();
-                camera.position = reflection_position;
+                {
+                    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, bunnyShader.bunny_reflection_fbo[i]);
+                    
+                    glClearColor(settings.clear_r, settings.clear_g, settings.clear_b, 1.0f);
+                    glViewport(0, 0, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION);
+                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                    
+                    glEnable(GL_DEPTH_TEST);
+                    glEnable(GL_CULL_FACE);
+                    glEnable(GL_FRAMEBUFFER_SRGB); 
+                    glCullFace(GL_BACK);
+                }
 
-                glm::mat4 model(1.f);
-
-                glm::mat4 view(1.f);
-                view = glm::lookAt(reflection_position, reflection_position + directions[i], up_directions[i]);
+                {
+                    Camera camera = Camera();
+                    camera.position = reflection_position;
     
-                glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, 1.f, settings.near, settings.far);
+                    glm::mat4 model(1.f);
     
-                sourceShader.model = model;
-                sourceShader.view = view;
-                sourceShader.projection = projection;
-                sourceShader.camera = camera;
-                sourceShader.ambient_light = AMBIENT_COLOR;
-                sourceShader.sun = sun;
-                sourceShader.light = light;
-                sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
-                sourceShader.shadowmap_projection = shadowmap_projection;
-                sourceShader.bump_mark = bump_mark;
-                sourceShader.specular_mark = specular_mark;
-                sourceShader.gamma_correction_mark = false;
-                sourceShader.aces_correction_mark = false;
-
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sourceShader.bunny_reflection_fbo[i]);
-                glClearColor(settings.clear_r, settings.clear_g, settings.clear_b, 1.0f);
-                glViewport(0, 0, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                glEnable(GL_DEPTH_TEST);
-                glEnable(GL_CULL_FACE);
-                glEnable(GL_FRAMEBUFFER_SRGB); 
-                glCullFace(GL_BACK);
-
-                sourceShader.DrawScene(settings, camera, scene);
+                    glm::mat4 view(1.f);
+                    view = glm::lookAt(reflection_position, reflection_position + directions[i], up_directions[i]);
+        
+                    glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, 1.f, settings.near, settings.far);
+        
+                    sourceShader.model = model;
+                    sourceShader.view = view;
+                    sourceShader.projection = projection;
+                    sourceShader.ambient_light = AMBIENT_COLOR;
+                    sourceShader.sun = sun;
+                    sourceShader.light = light;
+                    sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
+                    sourceShader.shadowmap_projection = shadowmap_projection;
+                    sourceShader.bump_mark = bump_mark;
+                    sourceShader.specular_mark = specular_mark;
+                    sourceShader.gamma_correction_mark = false;
+                    sourceShader.aces_correction_mark = false;
+    
+                    sourceShader.Draw(settings, camera, scene);
+                }
             }
         }
 
         { // Draw source
-            sourceShader.PrepareDraw(settings);
+            {
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+                glClearColor(settings.clear_r, settings.clear_g, settings.clear_b, 1.0f);
+                glViewport(0, 0, settings.width, settings.height);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+                glEnable(GL_DEPTH_TEST);
+                glEnable(GL_CULL_FACE);
+                glEnable(GL_FRAMEBUFFER_SRGB); 
+                glCullFace(GL_BACK);
+            }
 
             {
                 glm::mat4 model(1.f);
@@ -317,7 +327,6 @@ int main() try
                 sourceShader.model = model;
                 sourceShader.view = view;
                 sourceShader.projection = projection;
-                sourceShader.camera = camera;
                 sourceShader.ambient_light = AMBIENT_COLOR;
                 sourceShader.sun = sun;
                 sourceShader.light = light;
@@ -328,7 +337,7 @@ int main() try
                 sourceShader.gamma_correction_mark = gamma_correction_mark;
                 sourceShader.aces_correction_mark = aces_correction_mark;
     
-                sourceShader.DrawScene(settings, camera, scene);
+                sourceShader.Draw(settings, camera, scene);
             }
 
             {
@@ -340,26 +349,20 @@ int main() try
     
                 glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, (1.f * settings.width) / settings.height, settings.near, settings.far);
     
-                sourceShader.model = model;
-                sourceShader.view = view;
-                sourceShader.projection = projection;
-                sourceShader.camera = camera;
-                sourceShader.ambient_light = AMBIENT_COLOR;
-                sourceShader.sun = sun;
-                sourceShader.light = light;
-                sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
-                sourceShader.shadowmap_projection = shadowmap_projection;
-                sourceShader.bump_mark = bump_mark;
-                sourceShader.specular_mark = specular_mark;
-                sourceShader.gamma_correction_mark = gamma_correction_mark;
-                sourceShader.aces_correction_mark = aces_correction_mark;
+                bunnyShader.model = model;
+                bunnyShader.view = view;
+                bunnyShader.projection = projection;
+                bunnyShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
+                bunnyShader.shadowmap_projection = shadowmap_projection;
+                bunnyShader.gamma_correction_mark = gamma_correction_mark;
+                bunnyShader.aces_correction_mark = aces_correction_mark;
     
-                sourceShader.DrawBunny(settings, camera, scene, bunny);
+                bunnyShader.Draw(settings, camera, bunny);
             }
         }
 
         { // Draw debug
-            debugShader.shadowmapTexture = sourceShader.bunny_reflection_texture;
+            debugShader.shadowmapTexture = bunnyShader.bunny_reflection_texture;
             debugShader.Draw();
         }
 
