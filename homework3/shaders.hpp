@@ -150,50 +150,55 @@ vec3 MakeRealNormal() {
     }
 }
 
+vec3 AddAmbient(vec3 color) {
+    vec3 albedo = texture(albedoTexture, texcoord).rgb;
+    vec3 ambient_color = albedo * ambient_light;
+    return color + ambient_color;
+}
+
+vec3 AddSun(vec3 color) {
+    vec3 real_normal = MakeRealNormal();
+    vec4 ndc = shadowmap_projection * vec4(position, 1.0);
+            
+    if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
+        vec3 shadowmap_texcoord = ndc.xyz * 0.5 + 0.5;
+        
+        float sum = 0.0;
+        float sum_w = 0.0;
+        const int N = 5;
+        float radius = 7.0;
+        for (int x = -N; x <= N; x += 1) {
+            for (int y = -N; y <= N; y += 1) {
+                float c = exp(-float(x * x + y * y) / (radius*radius));
+                sum_w += c;
+                sum += c * texture(shadowmapTexture, shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(shadowmapTexture, 0), 1.0));
+            }
+        }
+
+        return color + sum / sum_w * phong(real_normal, sun_direction) * sun_color;
+    } else {
+        return color;
+    }
+}
+
+vec3 AddLight(vec3 color) {
+    vec3 real_normal = MakeRealNormal();
+    float distance = length(point_light_position - position);
+    float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
+    float light_attenuation = 1.0 / divider;
+    vec3 light_vector = normalize(point_light_position - position);
+
+    return color + phong(real_normal, light_vector) * light_attenuation * point_light_color;
+}
+
 vec3 MaterialColor() {
     if (has_alpha > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
         discard;
 
-    vec3 real_normal = MakeRealNormal();
-
-    vec3 albedo = texture(albedoTexture, texcoord).rgb;
     vec3 color = vec3(0.0);
-    
-    { // Add ambient color
-        vec3 ambient_color = albedo * ambient_light;
-        color += ambient_color;
-    }
-
-    { // Add sun color
-        vec4 ndc = shadowmap_projection * vec4(position, 1.0);
-        
-        if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
-            vec3 shadowmap_texcoord = ndc.xyz * 0.5 + 0.5;
-            
-            float sum = 0.0;
-            float sum_w = 0.0;
-            const int N = 5;
-            float radius = 7.0;
-            for (int x = -N; x <= N; x += 1) {
-                for (int y = -N; y <= N; y += 1) {
-                    float c = exp(-float(x * x + y * y) / (radius*radius));
-                    sum_w += c;
-                    sum += c * texture(shadowmapTexture, shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(shadowmapTexture, 0), 1.0));
-                }
-            }
-    
-            color += sum / sum_w * phong(real_normal, sun_direction) * sun_color;
-        }
-    }  
-    
-    { // Add light color
-        float distance = length(point_light_position - position);
-        float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
-        float light_attenuation = 1.0 / divider;
-        vec3 light_vector = normalize(point_light_position - position);
-
-        color += phong(real_normal, light_vector) * light_attenuation * point_light_color;
-    }
+    color = AddAmbient(color);
+    color = AddSun(color);
+    color = AddLight(color);
 
     return color;
 }
