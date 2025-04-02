@@ -161,7 +161,8 @@ void main()
 
     vec3 opacity = 1.0 - exp(-optical_depth);
 
-    color = mix(vec3(0.6, 0.8, 1.0), color, opacity);
+    vec3 ambient_color = vec3(0.8f, 0.8f, 0.9f); // Same as glClear color
+    color = mix(ambient_color, color, opacity);
 
     out_color = vec4(color, 1.0);
 }
