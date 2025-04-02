@@ -124,10 +124,11 @@ int main() try
 
     float time = 0.f;
     bool paused = false;
-    bool space_released = true;
+    bool bump_mark = false;
     auto last_frame_start = std::chrono::high_resolution_clock::now();
     
     std::map<SDL_Keycode, bool> button_down;
+    std::map<SDL_Keycode, bool> button_click;
 
     Camera camera = Camera();
     SourceShader sourceShader = SourceShader();
@@ -152,6 +153,7 @@ int main() try
             }
             break;
         case SDL_KEYDOWN:
+            button_click[event.key.keysym.sym] = !button_down[event.key.keysym.sym];
             button_down[event.key.keysym.sym] = true;
             break;
         case SDL_KEYUP:
@@ -183,17 +185,18 @@ int main() try
                 camera.RotateRight(dt);
             }
 
-            if (button_down[SDLK_SPACE]) {
-                if (space_released)
-                    paused = !paused;
-                space_released = false;
-            } else {
-                space_released = true;
+            if (button_click[SDLK_SPACE]) {
+                paused = !paused;
+                button_click[SDLK_SPACE] = false;
+            }
+            if (button_click[SDLK_b]) {
+                bump_mark = !bump_mark;
+                button_click[SDLK_b] = false;
             }
         }
 
         SunLight sun = { UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f), SUN_COLOR };
-        PointLight light = { LIGHT_POSITION, LIGHT_COLOR, LIGHT_ATTENUATION };
+        PointLight light = { LIGHT_POSITION + LIGHT_DELTA * 0.5f, LIGHT_COLOR, LIGHT_ATTENUATION };
 
         glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun.direction);
 
@@ -219,6 +222,7 @@ int main() try
             sourceShader.light = light;
             sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
             sourceShader.shadowmap_projection = shadowmap_projection;
+            sourceShader.bump_mark = bump_mark;
 
             sourceShader.Draw(settings, camera, scene);
         }

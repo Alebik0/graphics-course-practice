@@ -78,22 +78,51 @@ in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
-vec3 specular(vec3 direction)
+vec3 specular(
+    vec3 real_normal,
+    vec3 direction
+)
 {
     float power = roughness;
-    return glossiness * albedo * pow(max(0.0, dot(normal, direction)), power);
+    return glossiness * albedo * pow(max(0.0, dot(real_normal, direction)), power);
 }
 
-vec3 diffuse(vec3 direction)
+vec3 diffuse(
+    vec3 real_normal,
+    vec3 direction
+)
 {
-    return albedo * max(0.0, dot(normal, direction));
+    return albedo * max(0.0, dot(real_normal, direction));
 }
 
+vec3 PerturbNormal (
+    vec3 surf_pos,
+    vec3 surf_norm
+) {
+    vec3 vSigmaS = dFdx ( surf_pos );
+    vec3 vSigmaT = dFdy ( surf_pos );
+    vec3 vN = normalize(surf_norm) ; // normalized
+    vec3 vR1 = cross ( vSigmaT , vN );
+    vec3 vR2 = cross (vN , vSigmaS );
+    float fDet = dot ( vSigmaS , vR1 );
 
-float LinearizeDepth(float depth)
-{
-    float z = depth * 2.0 - 1.0; // Back to NDC 
-    return (2.0 * 0.1 * 1000.0) / (1000.0 + 0.1 - z * (1000.0 - 0.1));
+    float dBs, dBt;
+    { // Screen–space height derivative evaluation by forward differencing.
+        vec2 TexDx = dFdx ( texcoord );
+        vec2 TexDy = dFdx ( texcoord );
+        vec2 STll = texcoord;
+        vec2 STlr = texcoord + TexDx ;
+        vec2 STul = texcoord + TexDy ;
+        float Hll = texture(bumpTexture, STll).x;
+        float Hlr = texture(bumpTexture, STlr).x;
+        float Hul = texture(bumpTexture, STul).x;
+        dBs = Hlr - Hll ;
+        dBt = Hul - Hll ;
+    }
+
+    vec3 vSurfGrad = sign ( fDet ) * ( dBs * vR1 + dBt * vR2 );
+
+    return normalize ( abs ( fDet )*vN - vSurfGrad );
 }
 
 void main()
@@ -101,13 +130,20 @@ void main()
     if (has_alpha > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
         discard;
 
+    vec3 real_normal;
+    if (has_bump > 0.5) {
+        real_normal = PerturbNormal(position, normal);
+    } else {
+        real_normal = normal;
+    }
+
     albedo = texture(albedoTexture, texcoord).rgb;
     vec3 color = vec3(0.0);
     
     vec3 ambient_color = albedo * ambient_light;
     color += ambient_color;
 
-    vec3 sun_color = diffuse(sun_direction) * sun_color;
+    vec3 sun_color = diffuse(real_normal, sun_direction) * sun_color;
     
     { // Add sun color
         vec4 ndc = shadowmap_projection * vec4(position, 1.0);
@@ -135,7 +171,7 @@ void main()
     float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
     float light_attenuation = 1.0 / divider;
     vec3 light_vector = normalize(position - point_light_position);
-    vec3 light_color = (diffuse(-light_vector) + specular(-light_vector)) * light_attenuation * point_light_color;
+    vec3 light_color = (diffuse(real_normal, -light_vector) + specular(real_normal, -light_vector)) * light_attenuation * point_light_color;
     color += light_color;
 
     out_color = vec4(color, 1.0);
@@ -221,7 +257,9 @@ public:
     
     GLuint shadowmapTexture;
     glm::mat4 shadowmap_projection;
-    
+
+    bool bump_mark;
+
     SourceShader() {
         // Init program:
         GLuint source_vertex_shader = SourceShader::create_shader(GL_VERTEX_SHADER, vertex_shader_source);
@@ -295,9 +333,9 @@ public:
         glUniform3f(point_light_color_location, light.color.r, light.color.g, light.color.b);
         glUniform3f(point_light_attenuation_location, light.attenuation.x, light.attenuation.y, light.attenuation.z);
         
-        glActiveTexture(GL_TEXTURE2);
+        glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_2D, shadowmapTexture);
-        glUniform1i(shadowmapTexture_location, 2);
+        glUniform1i(shadowmapTexture_location, 3);
         glUniformMatrix4fv(shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
         
         { // Draw full scene
@@ -317,10 +355,10 @@ public:
                     glUniform1f(has_alpha_location, 0.0f);
                 }
 
-                if (face.bump_texture != 0) {
-                    glActiveTexture(GL_TEXTURE1);
+                if (face.bump_texture != 0 && bump_mark) {
+                    glActiveTexture(GL_TEXTURE2);
                     glBindTexture(GL_TEXTURE_2D, face.bump_texture);
-                    glUniform1i(bumpTexture_location, 1);
+                    glUniform1i(bumpTexture_location, 2);
                     glUniform1f(has_bump_location, 1.0f);
                 } else {
                     glUniform1f(has_bump_location, 0.0f);
