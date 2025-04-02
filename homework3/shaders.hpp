@@ -74,6 +74,8 @@ uniform float has_specular;
 uniform sampler2DShadow shadowmapTexture;
 uniform mat4 shadowmap_projection;
 
+uniform float has_gamma_correction;
+
 in vec3 position;
 in vec3 normal;
 in vec2 texcoord;
@@ -179,6 +181,12 @@ void main()
         color += phong(real_normal, light_vector) * light_attenuation * point_light_color;
     }
 
+    { // Gamma correction:
+        float gamma = 2.2;
+        if (has_gamma_correction > 0.5)
+            color = pow(color, vec3(1.0 / gamma));
+    }
+
     out_color = vec4(color, 1.0);
 }
 )";
@@ -213,6 +221,8 @@ void main()
 
     GLuint shadowmapTexture_location;
     GLuint shadowmap_projection_location;
+
+    GLuint has_gamma_correction_location;
 
     static GLuint create_shader(GLenum type, const char * source)
     {
@@ -272,6 +282,7 @@ public:
 
     bool bump_mark;
     bool specular_mark;
+    bool gamma_correction_mark;
 
     SourceShader() {
         // Init program:
@@ -302,6 +313,8 @@ public:
 
         shadowmapTexture_location = glGetUniformLocation(program, "shadowmapTexture");
         shadowmap_projection_location = glGetUniformLocation(program, "shadowmap_projection");
+
+        has_gamma_correction_location = glGetUniformLocation(program, "has_gamma_correction");
 
         // Init vao
         glGenVertexArrays(1, &vao);
@@ -335,6 +348,7 @@ public:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
+        glEnable(GL_FRAMEBUFFER_SRGB); 
         glCullFace(GL_BACK);
 
         glUseProgram(program);
@@ -357,6 +371,8 @@ public:
         glBindTexture(GL_TEXTURE_2D, shadowmapTexture);
         glUniform1i(shadowmapTexture_location, 4);
         glUniformMatrix4fv(shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
+        
+        glUniform1f(has_gamma_correction_location, gamma_correction_mark ? 1.0f : 0.0f);
         
         { // Draw full scene
             glBindVertexArray(vao);
