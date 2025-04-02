@@ -86,26 +86,32 @@ in vec3 normal;
 
 layout (location = 0) out vec4 out_color;
 
-vec3 specular(vec3 direction)
+vec3 specular(vec3 direction, vec3 normal)
 {
     float power = 1 / roughness / roughness - 1;
     return glossiness * albedo * pow(max(0.0, dot(normal, direction)), power);
 }
 
-vec3 diffuse(vec3 direction)
+vec3 diffuse(vec3 direction, vec3 normal)
 {
     return albedo * max(0.0, dot(normal, direction));
+}
+
+vec3 phong(vec3 direction) {
+    vec3 D = normalize(direction);
+    vec3 N = normalize(normal);    
+    return specular(D, N) + diffuse(D, N);
 }
 
 void main()
 {
     vec3 ambient_color = albedo * ambient_light;
-    vec3 sun_color = diffuse(sun_direction) * sun_color;
+    vec3 sun_color = phong(sun_direction) * sun_color;
  
     float distance = length(position - point_light_position);
     float light_attenuation = 1 / (point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z);
-    vec3 light_vector = normalize(position - point_light_position);
-    vec3 light_color = (diffuse(-light_vector) + specular(-light_vector)) * light_attenuation * point_light_color;
+    vec3 light_vector = normalize(point_light_position - position);
+    vec3 light_color = phong(light_vector) * light_attenuation * point_light_color;
 
     vec3 color = ambient_color + sun_color + light_color;
     
