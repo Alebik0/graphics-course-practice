@@ -375,8 +375,8 @@ int main() try
                     aabb aabb_obj = aabb(input_model.meshes[0].min + offset, input_model.meshes[0].max + offset);
 
                     if (intersect(frustum_obj, aabb_obj)) {
-                        float lod_step = 16 / 6;
-                        int lod_index = glm::length(offset) / lod_step;
+                        float lod_step = 32.f / 6.f;
+                        int lod_index = glm::length(offset - camera_position) / lod_step;
                         lod_index = std::max(lod_index, 0);
                         lod_index = std::min(lod_index, 5);
                         instancies[lod_index].push_back(offset);
