@@ -125,6 +125,7 @@ int main() try
     float time = 0.f;
     bool paused = false;
     bool bump_mark = false;
+    bool specular_mark = true;
     auto last_frame_start = std::chrono::high_resolution_clock::now();
     
     std::map<SDL_Keycode, bool> button_down;
@@ -189,14 +190,18 @@ int main() try
                 paused = !paused;
                 button_click[SDLK_SPACE] = false;
             }
-            if (button_click[SDLK_b]) {
+            if (button_click[SDLK_1]) {
                 bump_mark = !bump_mark;
-                button_click[SDLK_b] = false;
+                button_click[SDLK_1] = false;
+            }
+            if (button_click[SDLK_2]) {
+                specular_mark = !specular_mark;
+                button_click[SDLK_2] = false;
             }
         }
 
         SunLight sun = { UP + RGH * std::sin(time * 0.1f) + FWD * std::cos(time * 0.1f), SUN_COLOR };
-        PointLight light = { LIGHT_POSITION + LIGHT_DELTA * 0.5f, LIGHT_COLOR, LIGHT_ATTENUATION };
+        PointLight light = { LIGHT_POSITION + LIGHT_DELTA * 0.4f, LIGHT_COLOR, LIGHT_ATTENUATION };
 
         glm::mat4 shadowmap_projection = make_sun_shadowmap_projection(scene, sun.direction);
 
@@ -217,12 +222,14 @@ int main() try
             sourceShader.model = model;
             sourceShader.view = view;
             sourceShader.projection = projection;
+            sourceShader.camera = camera;
             sourceShader.ambient_light = AMBIENT_COLOR;
             sourceShader.sun = sun;
             sourceShader.light = light;
             sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
             sourceShader.shadowmap_projection = shadowmap_projection;
             sourceShader.bump_mark = bump_mark;
+            sourceShader.specular_mark = specular_mark;
 
             sourceShader.Draw(settings, camera, scene);
         }

@@ -49,7 +49,7 @@ void main()
     static inline char fragment_shader_source[] = 
 R"(#version 330 core
 
-vec3 albedo;
+uniform vec3 camera_position;
 
 uniform vec3 ambient_light;
 
@@ -61,13 +61,15 @@ uniform vec3 point_light_color;
 uniform vec3 point_light_attenuation;
 
 uniform vec3 glossiness;
-uniform float roughness;
+uniform float shininess;
 
 uniform sampler2D albedoTexture;
 uniform sampler2D alphaTexture;
 uniform float has_alpha;
 uniform sampler2D bumpTexture;
 uniform float has_bump;
+uniform sampler2D specularTexture;
+uniform float has_specular;
 
 uniform sampler2DShadow shadowmapTexture;
 uniform mat4 shadowmap_projection;
@@ -78,27 +80,28 @@ in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
-vec3 specular(
-    vec3 real_normal,
-    vec3 direction
-)
-{
-    float power = roughness;
-    return glossiness * albedo * pow(max(0.0, dot(real_normal, direction)), power);
+vec3 diffuse(vec3 real_normal, vec3 direction) {
+    return vec3(max(0.0, dot(real_normal, direction)));
 }
 
-vec3 diffuse(
-    vec3 real_normal,
-    vec3 direction
-)
-{
-    return albedo * max(0.0, dot(real_normal, direction));
+vec3 specular(vec3 real_normal, vec3 direction) {
+    vec3 reflected_direction = 2.0 * real_normal * dot(real_normal, direction) - direction;
+    vec3 view_direction = normalize(camera_position - position);
+    float spec = pow(max(dot(reflected_direction, view_direction), 0.0), shininess);
+    
+    if (has_specular > 0.5)
+        return glossiness * spec * texture(specularTexture, texcoord).rgb;
+    else
+        return glossiness * spec;
 }
 
-vec3 PerturbNormal (
-    vec3 surf_pos,
-    vec3 surf_norm
-) {
+vec3 phong(vec3 real_normal, vec3 direction) {
+    vec3 albedo = texture(albedoTexture, texcoord).rgb;
+
+    return albedo * (diffuse(real_normal, direction) + specular(real_normal, direction));
+}
+
+vec3 PerturbNormal(vec3 surf_pos, vec3 surf_norm) {
     vec3 vSigmaS = dFdx ( surf_pos );
     vec3 vSigmaT = dFdy ( surf_pos );
     vec3 vN = normalize(surf_norm) ; // normalized
@@ -132,19 +135,19 @@ void main()
 
     vec3 real_normal;
     if (has_bump > 0.5) {
-        real_normal = PerturbNormal(position, normal);
+        real_normal = normalize(PerturbNormal(position, normal));
     } else {
-        real_normal = normal;
+        real_normal = normalize(normal);
     }
 
-    albedo = texture(albedoTexture, texcoord).rgb;
+    vec3 albedo = texture(albedoTexture, texcoord).rgb;
     vec3 color = vec3(0.0);
     
-    vec3 ambient_color = albedo * ambient_light;
-    color += ambient_color;
+    { // Add ambient color
+        vec3 ambient_color = albedo * ambient_light;
+        color += ambient_color;
+    }
 
-    vec3 sun_color = diffuse(real_normal, sun_direction) * sun_color;
-    
     { // Add sun color
         vec4 ndc = shadowmap_projection * vec4(position, 1.0);
         
@@ -163,16 +166,18 @@ void main()
                 }
             }
     
-            color += sum / sum_w * sun_color;
+            color += sum / sum_w * phong(real_normal, sun_direction) * sun_color;
         }
     }  
     
-    float distance = length(point_light_position - position);
-    float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
-    float light_attenuation = 1.0 / divider;
-    vec3 light_vector = normalize(position - point_light_position);
-    vec3 light_color = (diffuse(real_normal, -light_vector) + specular(real_normal, -light_vector)) * light_attenuation * point_light_color;
-    color += light_color;
+    { // Add light color
+        float distance = length(point_light_position - position);
+        float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
+        float light_attenuation = 1.0 / divider;
+        vec3 light_vector = normalize(point_light_position - position);
+
+        color += phong(real_normal, light_vector) * light_attenuation * point_light_color;
+    }
 
     out_color = vec4(color, 1.0);
 }
@@ -184,6 +189,8 @@ void main()
     GLuint view_location;
     GLuint projection_location;
 
+    GLuint camera_position_location;
+
     GLuint ambient_light_location;
 
     GLuint sun_direction_location;
@@ -194,13 +201,15 @@ void main()
     GLuint point_light_attenuation_location;
 
     GLuint glossiness_location;
-    GLuint roughness_location;
+    GLuint shininess_location;
 
     GLuint albedoTexture_location;
     GLuint alphaTexture_location;
     GLuint has_alpha_location;
     GLuint bumpTexture_location;
     GLuint has_bump_location;
+    GLuint specularTexture_location;
+    GLuint has_specular_location;
 
     GLuint shadowmapTexture_location;
     GLuint shadowmap_projection_location;
@@ -219,6 +228,8 @@ void main()
             std::string info_log(info_log_length, '\0');
             glGetShaderInfoLog(result, info_log.size(), nullptr, info_log.data());
             throw std::runtime_error("Shader compilation failed: " + info_log);
+        } else {
+            std::cout << "Shader compilation successful" << std::endl;
         }
         return result;
     }
@@ -252,6 +263,7 @@ public:
 
     glm::vec3 ambient_light;
 
+    Camera camera;
     SunLight sun;
     PointLight light;
     
@@ -259,6 +271,7 @@ public:
     glm::mat4 shadowmap_projection;
 
     bool bump_mark;
+    bool specular_mark;
 
     SourceShader() {
         // Init program:
@@ -269,6 +282,7 @@ public:
         model_location = glGetUniformLocation(program, "model");
         view_location = glGetUniformLocation(program, "view");
         projection_location = glGetUniformLocation(program, "projection");
+        camera_position_location = glGetUniformLocation(program, "camera_position");
         ambient_light_location = glGetUniformLocation(program, "ambient_light");
         sun_direction_location = glGetUniformLocation(program, "sun_direction");
         sun_color_location = glGetUniformLocation(program, "sun_color");
@@ -276,12 +290,16 @@ public:
         point_light_color_location = glGetUniformLocation(program, "point_light_color");
         point_light_attenuation_location = glGetUniformLocation(program, "point_light_attenuation");
         glossiness_location = glGetUniformLocation(program, "glossiness");
-        roughness_location = glGetUniformLocation(program, "roughness");
+        shininess_location = glGetUniformLocation(program, "shininess");
+
         albedoTexture_location = glGetUniformLocation(program, "albedoTexture");
         alphaTexture_location = glGetUniformLocation(program, "alphaTexture");
-        has_alpha_location = glGetUniformLocation(program, "has_alpha");
         bumpTexture_location = glGetUniformLocation(program, "bumpTexture");
+        specularTexture_location = glGetUniformLocation(program, "specularTexture");
+        has_alpha_location = glGetUniformLocation(program, "has_alpha");
         has_bump_location = glGetUniformLocation(program, "has_bump");
+        has_specular_location = glGetUniformLocation(program, "has_specular");
+
         shadowmapTexture_location = glGetUniformLocation(program, "shadowmapTexture");
         shadowmap_projection_location = glGetUniformLocation(program, "shadowmap_projection");
 
@@ -324,6 +342,8 @@ public:
         glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
         glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
 
+        glUniform3f(camera_position_location, camera.position.x, camera.position.y, camera.position.z);
+
         glUniform3f(ambient_light_location, ambient_light.r, ambient_light.g, ambient_light.b);
         
         glUniform3f(sun_direction_location, sun.direction.x, sun.direction.y, sun.direction.z);
@@ -333,9 +353,9 @@ public:
         glUniform3f(point_light_color_location, light.color.r, light.color.g, light.color.b);
         glUniform3f(point_light_attenuation_location, light.attenuation.x, light.attenuation.y, light.attenuation.z);
         
-        glActiveTexture(GL_TEXTURE3);
+        glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, shadowmapTexture);
-        glUniform1i(shadowmapTexture_location, 3);
+        glUniform1i(shadowmapTexture_location, 4);
         glUniformMatrix4fv(shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
         
         { // Draw full scene
@@ -364,8 +384,17 @@ public:
                     glUniform1f(has_bump_location, 0.0f);
                 }
 
+                if (face.specular_texture != 0 && specular_mark) {
+                    glActiveTexture(GL_TEXTURE3);
+                    glBindTexture(GL_TEXTURE_2D, face.specular_texture);
+                    glUniform1i(specularTexture_location, 3);
+                    glUniform1f(has_specular_location, 1.0f);
+                } else {
+                    glUniform1f(has_specular_location, 0.0f);
+                }
+
                 glUniform3f(glossiness_location, face.glossiness[0], face.glossiness[1], face.glossiness[2]);
-                glUniform1f(roughness_location, face.power);
+                glUniform1f(shininess_location, face.power);
 
                 glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
             }

@@ -97,6 +97,7 @@ obj_data make_scene(
         current_face_data.albedo_texname = material.ambient_texname;
         current_face_data.alpha_texname = material.alpha_texname;
         current_face_data.bump_texname = material.bump_texname;
+        current_face_data.specular_texname = material.specular_texname;
         current_face_data.glossiness = { material.specular[0], material.specular[1], material.specular[2] };
         current_face_data.power = material.shininess;
 
@@ -189,6 +190,35 @@ obj_data make_scene(
             current_face_data.bump_texture = 0;
         }
 
+        if (current_face_data.specular_texname != "") {
+            std::string texture_path = current_face_data.specular_texname;
+            texture_path = texture_path.replace(texture_path.find("\\", 0), 1, "/");
+            texture_path = scene_dir + texture_path;
+
+            int texture_width, texture_height, texture_cpx;
+            unsigned char * texture_pixels = stbi_load(
+                texture_path.c_str(),
+                &texture_width,
+                &texture_height,
+                &texture_cpx,
+                4);
+
+
+            GLuint textureID;
+            glGenTextures(1, &textureID);
+            glBindTexture(GL_TEXTURE_2D, textureID);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+        
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_pixels);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            stbi_image_free(texture_pixels);
+
+            current_face_data.specular_texture = textureID;
+        } else {
+            current_face_data.specular_texture = 0;
+        }
 
         scene.faces.push_back(current_face_data);
     }

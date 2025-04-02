@@ -107,11 +107,14 @@ struct obj_data
         std::string albedo_texname;             // TinyObj -> ambient_texname
         std::string alpha_texname;              // TinyObj -> alpha_texname
         std::string bump_texname;               // TinyObj -> bump_texname
+        std::string specular_texname;           // TinyObj -> specular_texname
         std::array<float, 3> glossiness;        // TinyObj -> specular
         float power;                            // TinyObj -> shininess
         GLuint albedo_texture;
         GLuint alpha_texture;
         GLuint bump_texture;
+        GLuint specular_texture;
+;
     };
 
     std::vector<vertex> vertices;
