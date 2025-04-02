@@ -78,11 +78,22 @@ uniform float has_gamma_correction;
 uniform float has_aces_correction;
 uniform float reflection_draw_mode;
 
+uniform samplerCube reflection_texture;
+
 in vec3 position;
 in vec3 normal;
 in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
+
+vec3 ReflectionColor() {
+    vec3 real_normal = normalize(normal);
+    vec3 view_direction = normalize(camera_position - position);
+    vec3 reflected_direction = 2.0 * real_normal * dot(real_normal, view_direction) - view_direction;
+    vec3 color = texture(reflection_texture, reflected_direction).rgb;
+
+    return color;
+}
 
 vec3 diffuse(vec3 real_normal, vec3 direction) {
     return vec3(max(0.0, dot(real_normal, direction)));
@@ -142,23 +153,19 @@ vec3 ACESFilm(vec3 x)
     return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
 }
 
-void main()
-{
-    if (reflection_draw_mode > 0.5) {
-        out_color = vec4(1.0, 0.0, 0.0, 1.0);
-
-        return;
+vec3 MakeRealNormal() {
+    if (has_bump > 0.5) {
+        return normalize(PerturbNormal(position, normal));
+    } else {
+        return normalize(normal);
     }
+}
 
+vec3 MaterialColor() {
     if (has_alpha > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
         discard;
 
-    vec3 real_normal;
-    if (has_bump > 0.5) {
-        real_normal = normalize(PerturbNormal(position, normal));
-    } else {
-        real_normal = normalize(normal);
-    }
+    vec3 real_normal = MakeRealNormal();
 
     vec3 albedo = texture(albedoTexture, texcoord).rgb;
     vec3 color = vec3(0.0);
@@ -197,6 +204,18 @@ void main()
         vec3 light_vector = normalize(point_light_position - position);
 
         color += phong(real_normal, light_vector) * light_attenuation * point_light_color;
+    }
+
+    return color;
+}
+
+void main()
+{
+    vec3 color;
+    if (reflection_draw_mode > 0.5) {
+        color = ReflectionColor();
+    } else {
+        color = MaterialColor();
     }
 
     { // Gamma correction:
@@ -247,6 +266,7 @@ void main()
     GLuint has_aces_correction_location;
 
     GLuint reflection_draw_mode_location;
+    GLuint reflection_texture_location;
 
     static GLuint create_shader(GLenum type, const char * source)
     {
@@ -347,6 +367,8 @@ public:
         has_aces_correction_location = glGetUniformLocation(program, "has_aces_correction");
 
         reflection_draw_mode_location = glGetUniformLocation(program, "reflection_draw_mode");
+        reflection_texture_location = glGetUniformLocation(program, "reflection_texture");
+        
 
         // Init vao
         glGenVertexArrays(1, &vao);
@@ -428,9 +450,10 @@ public:
         glUniform3f(point_light_color_location, light.color.r, light.color.g, light.color.b);
         glUniform3f(point_light_attenuation_location, light.attenuation.x, light.attenuation.y, light.attenuation.z);
         
-        glActiveTexture(GL_TEXTURE4);
+        glActiveTexture(GL_TEXTURE5);
         glBindTexture(GL_TEXTURE_2D, shadowmapTexture);
-        glUniform1i(shadowmapTexture_location, 4);
+        glUniform1i(shadowmapTexture_location, 5);
+        
         glUniformMatrix4fv(shadowmap_projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&shadowmap_projection));
         
         glUniform1f(has_gamma_correction_location, gamma_correction_mark ? 1.0f : 0.0f);
@@ -474,6 +497,10 @@ public:
                 glUniform3f(glossiness_location, face.glossiness[0], face.glossiness[1], face.glossiness[2]);
                 glUniform1f(shininess_location, face.power);
                 glUniform1f(reflection_draw_mode_location, 0.0f);
+
+                glActiveTexture(GL_TEXTURE4);
+                glBindTexture(GL_TEXTURE_CUBE_MAP, bunny_reflection_texture);
+                glUniform1i(reflection_texture_location, 4);
 
                 glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
             }
