@@ -304,6 +304,10 @@ public:
     GLuint shadowmapTexture;
     glm::mat4 shadowmap_projection;
 
+    GLuint bunny_reflection_texture;
+    GLuint bunny_reflection_rbo[6];
+    GLuint bunny_reflection_fbo[6];
+
     bool bump_mark;
     bool specular_mark;
     bool gamma_correction_mark;
@@ -357,6 +361,35 @@ public:
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(12));
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(24));
+
+        // Cubemap reflection
+        glGenTextures(1, &bunny_reflection_texture);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, bunny_reflection_texture);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + 0, 0, GL_SRGB, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + 1, 0, GL_SRGB, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + 2, 0, GL_SRGB, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + 3, 0, GL_SRGB, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + 4, 0, GL_SRGB, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + 5, 0, GL_SRGB, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+        {
+            glGenRenderbuffers(1, bunny_reflection_rbo + 0);
+            glBindRenderbuffer(GL_RENDERBUFFER, bunny_reflection_rbo[0]);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION);
+    
+            glGenFramebuffers(1, bunny_reflection_fbo + 0);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, bunny_reflection_fbo[0]);
+            glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + 0, bunny_reflection_texture, 0);
+            glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, bunny_reflection_rbo[0]);
+    
+            if (glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+                throw std::runtime_error("Incomplete framebuffer!");
+        }
     }
 
     void UpdateBufferData(const std::vector<obj_data::vertex> & vertices) {
@@ -630,34 +663,28 @@ vec2 vertices[6] = vec2[6](
     vec2(-1.0,  1.0)
 );
 
-out vec2 texcoord;
+out vec3 texcoord;
 
 void main()
 {
     vec2 position = vertices[gl_VertexID];
     gl_Position = vec4(position * 0.25 + vec2(-0.75, -0.75), 0.0, 1.0);
-    texcoord = position * 0.5 + vec2(0.5);
+    texcoord = vec3(1.0, -position.yx);
 }
 )";
     
     static inline char debug_fragment_shader[] = 
 R"(#version 330 core
 
-uniform sampler2D shadowmapTexture;
+uniform samplerCube shadowmapTexture;
 
-in vec2 texcoord;
+in vec3 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
-float LinearizeDepth(float depth)
-{
-    float z = depth * 2.0 - 1.0; // Back to NDC 
-    return (2.0 * 0.1 * 1000.0) / (1000.0 + 0.1 - z * (1000.0 - 0.1));
-}
-
 void main()
 {
-    out_color = vec4(vec3(LinearizeDepth(texture(shadowmapTexture, texcoord).r)) / 1000.0, 1.0);
+    out_color = vec4(texture(shadowmapTexture, texcoord).rgb, 1.0);
 }
 )";
 

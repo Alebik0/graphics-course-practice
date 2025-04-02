@@ -32,3 +32,4 @@ const glm::vec3 LIGHT_ATTENUATION(0.4f, 0.f, 0.00005f);
 const glm::vec3 LIGHT_POSITION(1250.f, 100.f, 0.f);
 const glm::vec3 LIGHT_DELTA(0.f, 0.f, 500.f);
 const GLsizei SHADOWMAP_RESOLUTION = 4096;
+const GLsizei REFLECTION_CUBEMAP_RESOLUTION = 256;

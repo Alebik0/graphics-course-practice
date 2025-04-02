@@ -236,6 +236,45 @@ int main() try
             shadowmapShader.Draw(sourceShader, scene);
         }
 
+        { // Draw reflections
+            {
+                Camera camera = Camera();
+                camera.position = glm::vec3(0.f);
+
+                glm::mat4 model(1.f);
+
+                glm::mat4 view(1.f);
+                view = glm::lookAt(glm::vec3(0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
+    
+                glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, 1.f, settings.near, settings.far);
+    
+                sourceShader.model = model;
+                sourceShader.view = view;
+                sourceShader.projection = projection;
+                sourceShader.camera = camera;
+                sourceShader.ambient_light = AMBIENT_COLOR;
+                sourceShader.sun = sun;
+                sourceShader.light = light;
+                sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
+                sourceShader.shadowmap_projection = shadowmap_projection;
+                sourceShader.bump_mark = bump_mark;
+                sourceShader.specular_mark = specular_mark;
+                sourceShader.gamma_correction_mark = false;
+                sourceShader.aces_correction_mark = false;
+
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sourceShader.bunny_reflection_fbo[0]);
+                glClearColor(settings.clear_r, settings.clear_g, settings.clear_b, 1.0f);
+                glViewport(0, 0, REFLECTION_CUBEMAP_RESOLUTION, REFLECTION_CUBEMAP_RESOLUTION);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                glEnable(GL_DEPTH_TEST);
+                glEnable(GL_CULL_FACE);
+                glEnable(GL_FRAMEBUFFER_SRGB); 
+                glCullFace(GL_BACK);
+
+                sourceShader.DrawScene(settings, camera, scene);
+            }
+        }
+
         { // Draw source
             sourceShader.PrepareDraw(settings);
 
@@ -292,6 +331,11 @@ int main() try
     
                 sourceShader.DrawBunny(settings, camera, scene, bunny);
             }
+        }
+
+        { // Draw debug
+            debugShader.shadowmapTexture = sourceShader.bunny_reflection_texture;
+            debugShader.Draw();
         }
 
         SDL_GL_SwapWindow(window);
