@@ -119,8 +119,10 @@ int main() try
 
     std::string project_root = PROJECT_ROOT;
     std::string scene_path = project_root + "/data/sponza/sponza.obj";
+    std::string bunny_path = project_root + "/data/bunny/bunny.obj";
     std::string scene_dir = project_root + "/data/sponza/";
     obj_data scene = load_scene(scene_path, scene_dir);
+    obj_data bunny = load_bunny(bunny_path);
 
     float time = 0.f;
     bool paused = false;
@@ -137,7 +139,15 @@ int main() try
     SourceShader sourceShader = SourceShader();
     ShadowmapShader shadowmapShader = ShadowmapShader();
     DebugShader debugShader = DebugShader();
-    sourceShader.UpdateBufferData(scene);
+    { // Fill vbo
+        std::vector<obj_data::vertex> verticies;
+        for (const auto v : scene.vertices)
+            verticies.push_back(v);
+        for (const auto v : bunny.vertices)
+            verticies.push_back(v);
+            
+        sourceShader.UpdateBufferData(verticies);
+    }
 
     bool running = true;
     while (running)
@@ -227,29 +237,61 @@ int main() try
         }
 
         { // Draw source
-            glm::mat4 model(1.f);
+            sourceShader.PrepareDraw(settings);
 
-            glm::mat4 view(1.f);
-            view = glm::rotate(view, camera.angle, UP);
-            view = glm::translate(view, -camera.position);
+            {
+                glm::mat4 model(1.f);
 
-            glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, (1.f * settings.width) / settings.height, settings.near, settings.far);
+                glm::mat4 view(1.f);
+                view = glm::rotate(view, camera.angle, UP);
+                view = glm::translate(view, -camera.position);
+    
+                glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, (1.f * settings.width) / settings.height, settings.near, settings.far);
+    
+                sourceShader.model = model;
+                sourceShader.view = view;
+                sourceShader.projection = projection;
+                sourceShader.camera = camera;
+                sourceShader.ambient_light = AMBIENT_COLOR;
+                sourceShader.sun = sun;
+                sourceShader.light = light;
+                sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
+                sourceShader.shadowmap_projection = shadowmap_projection;
+                sourceShader.bump_mark = bump_mark;
+                sourceShader.specular_mark = specular_mark;
+                sourceShader.gamma_correction_mark = gamma_correction_mark;
+                sourceShader.aces_correction_mark = aces_correction_mark;
+    
+                sourceShader.DrawScene(settings, camera, scene);
+            }
 
-            sourceShader.model = model;
-            sourceShader.view = view;
-            sourceShader.projection = projection;
-            sourceShader.camera = camera;
-            sourceShader.ambient_light = AMBIENT_COLOR;
-            sourceShader.sun = sun;
-            sourceShader.light = light;
-            sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
-            sourceShader.shadowmap_projection = shadowmap_projection;
-            sourceShader.bump_mark = bump_mark;
-            sourceShader.specular_mark = specular_mark;
-            sourceShader.gamma_correction_mark = gamma_correction_mark;
-            sourceShader.aces_correction_mark = aces_correction_mark;
+            {
+                glm::mat4 model(1.f);
+                model = glm::translate(model, glm::vec3(0.f, 25.f, 0.f));
+                model = glm::scale(model, glm::vec3(100.f));
 
-            sourceShader.Draw(settings, camera, scene);
+                glm::mat4 view(1.f);
+                view = glm::rotate(view, camera.angle, UP);
+                view = glm::translate(view, -camera.position);
+    
+                glm::mat4 projection = glm::perspective(glm::pi<float>() / 2.f, (1.f * settings.width) / settings.height, settings.near, settings.far);
+    
+                sourceShader.model = model;
+                sourceShader.view = view;
+                sourceShader.projection = projection;
+                sourceShader.camera = camera;
+                sourceShader.ambient_light = AMBIENT_COLOR;
+                sourceShader.sun = sun;
+                sourceShader.light = light;
+                sourceShader.shadowmapTexture = shadowmapShader.shadowmapTexture;
+                sourceShader.shadowmap_projection = shadowmap_projection;
+                sourceShader.bump_mark = bump_mark;
+                sourceShader.specular_mark = specular_mark;
+                sourceShader.gamma_correction_mark = gamma_correction_mark;
+                sourceShader.aces_correction_mark = aces_correction_mark;
+    
+                sourceShader.DrawBunny(settings, camera, scene, bunny);
+            }
         }
 
         SDL_GL_SwapWindow(window);

@@ -39,7 +39,7 @@ out vec2 texcoord;
 
 void main()
 {
-    position = in_position;
+    position = mat3(model) * in_position;
     gl_Position = projection * view * vec4(position, 1.0);
     normal = normalize(mat3(model) * in_normal);
     texcoord = in_texcoord;
@@ -76,6 +76,7 @@ uniform mat4 shadowmap_projection;
 
 uniform float has_gamma_correction;
 uniform float has_aces_correction;
+uniform float reflection_draw_mode;
 
 in vec3 position;
 in vec3 normal;
@@ -143,6 +144,12 @@ vec3 ACESFilm(vec3 x)
 
 void main()
 {
+    if (reflection_draw_mode > 0.5) {
+        out_color = vec4(1.0, 0.0, 0.0, 1.0);
+
+        return;
+    }
+
     if (has_alpha > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
         discard;
 
@@ -239,6 +246,8 @@ void main()
     GLuint has_gamma_correction_location;
     GLuint has_aces_correction_location;
 
+    GLuint reflection_draw_mode_location;
+
     static GLuint create_shader(GLenum type, const char * source)
     {
         GLuint result = glCreateShader(type);
@@ -333,6 +342,8 @@ public:
         has_gamma_correction_location = glGetUniformLocation(program, "has_gamma_correction");
         has_aces_correction_location = glGetUniformLocation(program, "has_aces_correction");
 
+        reflection_draw_mode_location = glGetUniformLocation(program, "reflection_draw_mode");
+
         // Init vao
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
@@ -348,16 +359,14 @@ public:
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void*)(24));
     }
 
-    void UpdateBufferData(const obj_data & scene) {
+    void UpdateBufferData(const std::vector<obj_data::vertex> & vertices) {
         glBindVertexArray(vao);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, scene.vertices.size() * sizeof(scene.vertices[0]), scene.vertices.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(vertices[0]), vertices.data(), GL_STATIC_DRAW);
     }
 
-    void Draw(
-        const Settings & settings,
-        const Camera & camera,
-        const obj_data & scene
+    void PrepareDraw(
+        const Settings & settings
     ) {
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         glClearColor(settings.clear_r, settings.clear_g, settings.clear_b, 1.0f);
@@ -367,7 +376,13 @@ public:
         glEnable(GL_CULL_FACE);
         glEnable(GL_FRAMEBUFFER_SRGB); 
         glCullFace(GL_BACK);
+    }
 
+    void DrawScene(
+        const Settings & settings,
+        const Camera & camera,
+        const obj_data & scene
+    ) {
         glUseProgram(program);
         glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
         glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
@@ -429,8 +444,47 @@ public:
 
                 glUniform3f(glossiness_location, face.glossiness[0], face.glossiness[1], face.glossiness[2]);
                 glUniform1f(shininess_location, face.power);
+                glUniform1f(reflection_draw_mode_location, 0.0f);
 
                 glDrawArrays(GL_TRIANGLES, face.firstVertex, face.countVertex);
+            }
+        }
+    }
+
+    void DrawBunny(
+        const Settings & settings,
+        const Camera & camera,
+        const obj_data & scene,
+        const obj_data & bunny
+    ) {
+        glUseProgram(program);
+        glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
+        glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
+        glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+
+        glUniform3f(camera_position_location, camera.position.x, camera.position.y, camera.position.z);
+
+        glUniform3f(ambient_light_location, ambient_light.r, ambient_light.g, ambient_light.b);
+        
+        glUniform3f(sun_direction_location, sun.direction.x, sun.direction.y, sun.direction.z);
+        glUniform3f(sun_color_location, sun.color.r, sun.color.g, sun.color.b);
+
+        glUniform3f(point_light_position_location, light.position.x, light.position.y, light.position.z);
+        glUniform3f(point_light_color_location, light.color.r, light.color.g, light.color.b);
+        glUniform3f(point_light_attenuation_location, light.attenuation.x, light.attenuation.y, light.attenuation.z);
+        
+        glUniform1f(has_gamma_correction_location, gamma_correction_mark ? 1.0f : 0.0f);
+        glUniform1f(has_aces_correction_location, aces_correction_mark ? 1.0f : 0.0f);
+
+        { // Draw bunny
+            glBindVertexArray(vao);
+
+            for (obj_data::face_data face : bunny.faces) {
+                glUniform3f(glossiness_location, face.glossiness[0], face.glossiness[1], face.glossiness[2]);
+                glUniform1f(shininess_location, face.power);
+                glUniform1f(reflection_draw_mode_location, 1.0f);
+
+                glDrawArrays(GL_TRIANGLES, scene.vertices.size() + face.firstVertex, face.countVertex);
             }
         }
     }
