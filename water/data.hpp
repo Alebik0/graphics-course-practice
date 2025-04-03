@@ -14,7 +14,7 @@
 class Camera {
 private:
     float ROTATION_SPEED = glm::pi<float>() / 2;
-    float MOVEMENT_SPEED = 1.f;
+    float MOVEMENT_SPEED = 20.f;
 public:
     glm::vec3 position;
     glm::vec3 direction;
@@ -23,11 +23,11 @@ public:
     Camera() {}
 
     void RotateLeft(const float dt) {
-        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), -ROTATION_SPEED * dt, up)) * direction;
+        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), ROTATION_SPEED * dt, up)) * direction;
     }
 
     void RotateRight(const float dt) {
-        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), ROTATION_SPEED * dt, up)) * direction;
+        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), -ROTATION_SPEED * dt, up)) * direction;
     }
 
     void RotateUp(const float dt) {
@@ -43,27 +43,29 @@ public:
     }
 
     void MoveForward(const float dt) {
-
+        position += direction * MOVEMENT_SPEED * dt;
     }
 
     void MoveBackward(const float dt) {
-
+        position -= direction * MOVEMENT_SPEED * dt;
     }
 
     void MoveLeft(const float dt) {
-
+        glm::vec3 right = glm::cross(direction, up);
+        position -= right * MOVEMENT_SPEED * dt;
     }
 
     void MoveRight(const float dt) {
-
+        glm::vec3 right = glm::cross(direction, up);
+        position += right * MOVEMENT_SPEED * dt;
     }
 
     void MoveUpward(const float dt) {
-
+        position += up * MOVEMENT_SPEED * dt;
     }
 
     void MoveDownward(const float dt) {
-
+        position -= up * MOVEMENT_SPEED * dt;
     }
 
 };
