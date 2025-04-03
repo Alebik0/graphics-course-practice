@@ -68,8 +68,8 @@ vec3 diffuse(vec3 real_normal, vec3 direction) {
 }
 
 vec3 specular(vec3 real_normal, vec3 direction) {
-    vec3 view_direction = normalize(position - camera_position);
-    vec3 reflected_direction = reflect(view_direction, real_normal);
+    vec3 view_direction = normalize(camera_position - position);
+    vec3 reflected_direction = reflect(-normalize(sun_direction), real_normal);
 
     return glossiness * pow(max(dot(reflected_direction, view_direction), 0.0), shininess);
 }
@@ -599,7 +599,7 @@ public:
         glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
 
         glUniform3f(camera_position_location, camera_position.x, camera_position.y, camera_position.z);
-        
+
         glUniform3f(ambient_light_location, ambient_light.x, ambient_light.y, ambient_light.z);
         glUniform3f(sun_direction_location, sun_direction.x, sun_direction.y, sun_direction.z);
         glUniform3f(sun_color_location, sun_color.x, sun_color.y, sun_color.z);

@@ -23,11 +23,13 @@ public:
     Camera() {}
 
     void RotateLeft(const float dt) {
-        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), ROTATION_SPEED * dt, up)) * direction;
+        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), ROTATION_SPEED * dt, glm::vec3(0.f, 1.f, 0.f))) * direction;
+        up = glm::mat3(glm::rotate(glm::mat4(1.0f), ROTATION_SPEED * dt, glm::vec3(0.f, 1.f, 0.f))) * up;
     }
 
     void RotateRight(const float dt) {
-        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), -ROTATION_SPEED * dt, up)) * direction;
+        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), -ROTATION_SPEED * dt, glm::vec3(0.f, 1.f, 0.f))) * direction;
+        up = glm::mat3(glm::rotate(glm::mat4(1.0f), -ROTATION_SPEED * dt, glm::vec3(0.f, 1.f, 0.f))) * up;
     }
 
     void RotateUp(const float dt) {

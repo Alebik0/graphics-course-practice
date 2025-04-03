@@ -309,9 +309,9 @@ int main() try
         }
 
         glm::vec3 ambient_light = glm::vec3(0.2f, 0.2f, 0.2f);
-        glm::vec3 sun_direction = glm::vec3(-2.f, 1.f, -5.f);
-        glm::vec3 sun_color = glm::vec3(0.6f, 0.55f, 0.4f);
-        glm::vec3 glossiness = glm::vec3(1.f, 1.f, 1.f);
+        glm::vec3 sun_direction = glm::vec3(2.f, 1.f, 5.f);
+        glm::vec3 sun_color = glm::vec3(0.8f, 0.7f, 0.4f);
+        glm::vec3 glossiness = glm::vec3(1.4f);
         float shininess = 32.f;
 
         { // Draw
