@@ -263,16 +263,22 @@ int main() try
             skyboxShader.Draw(0, 6);
         }
 
+        glm::vec3 ambient_light = glm::vec3(0.2f, 0.2f, 0.2f);
+        glm::vec3 sun_direction = glm::vec3(-2.f, 1.f, -5.f);
+        glm::vec3 sun_color = glm::vec3(0.6f, 0.55f, 0.4f);
+        glm::vec3 glossiness = glm::vec3(1.f, 1.f, 1.f);
+        float shininess = 32.f;
+
         { // Draw
             glEnable(GL_DEPTH_TEST);
             poolShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
             poolShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
             poolShader.camera_position = camera.position;
-            poolShader.ambient_light = glm::vec3(0.2f, 0.2f, 0.2f);
-            poolShader.sun_direction = glm::vec3(-2.f, 1.f, -5.f);
-            poolShader.sun_color = glm::vec3(0.6f, 0.55f, 0.4f);
-            poolShader.glossiness = glm::vec3(1.f, 1.f, 1.f);
-            poolShader.shininess = 32.f;
+            poolShader.ambient_light = ambient_light;
+            poolShader.sun_direction = sun_direction;
+            poolShader.sun_color = sun_color;
+            poolShader.glossiness = glossiness;
+            poolShader.shininess = shininess;
             poolShader.albedoTexture = albedoTextureID;
             poolShader.Draw(0, 6);
         }
@@ -283,6 +289,11 @@ int main() try
             waterShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
             waterShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
             waterShader.camera_position = camera.position;
+            waterShader.ambient_light = ambient_light;
+            waterShader.sun_direction = sun_direction;
+            waterShader.sun_color = sun_color;
+            waterShader.glossiness = glossiness;
+            waterShader.shininess = shininess;
             waterShader.albedoTexture = albedoTextureID;
             waterShader.environmentTexture = environmentTextureID;
             waterShader.Draw(0, mesh.size());
