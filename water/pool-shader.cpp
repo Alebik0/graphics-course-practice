@@ -1,0 +1,252 @@
+#ifdef WIN32
+#include <SDL.h>
+#undef main
+#else
+#include <SDL2/SDL.h>
+#endif
+#include <GL/glew.h>
+
+#define GLM_FORCE_SWIZZLE
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/scalar_constants.hpp>
+#include <glm/gtx/string_cast.hpp>
+
+#include <stdexcept>
+#include <vector>
+#include "data.hpp"
+
+
+class PoolShader {
+private:
+    static inline char vertex_shader_source[] =  
+R"(#version 330 core
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+layout (location = 0) in vec3 in_position;
+
+out vec3 position;
+out vec3 normal;
+
+void main()
+{
+    const float X_LEN = 4.0;
+    const float Y_LEN = 2.0;
+    position    = vec3(model * vec4(in_position, 1.0));
+    normal      = vec3(0.0, 1.0, 0.0);
+    gl_Position = projection * view * vec4(position, 1.0);
+}
+)";
+
+    static inline char fragment_shader_source[] = 
+R"(#version 330 core
+
+uniform vec3 camera_position;
+
+uniform vec3 ambient_light;
+
+uniform vec3 sun_direction;
+uniform vec3 sun_color;
+
+uniform vec3 glossiness;
+uniform float shininess;
+
+uniform sampler2D albedoTexture;
+
+in vec3 position;
+in vec3 normal;
+vec2 texcoord;
+
+layout (location = 0) out vec4 out_color;
+
+vec3 diffuse(vec3 real_normal, vec3 direction) {
+    return vec3(max(0.0, dot(real_normal, direction)));
+}
+
+vec3 specular(vec3 real_normal, vec3 direction) {
+    vec3 reflected_direction = 2.0 * real_normal * dot(real_normal, direction) - direction;
+    vec3 view_direction = normalize(camera_position - position);
+
+    return glossiness * pow(max(dot(reflected_direction, view_direction), 0.0), shininess);
+}
+
+vec3 phong(vec3 real_normal, vec3 direction) {
+    vec3 albedo = texture(albedoTexture, texcoord).rgb;
+
+    return albedo * (diffuse(real_normal, direction) + specular(real_normal, direction));
+}
+
+vec3 ACESFilm(vec3 x)
+{
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
+}
+
+vec3 AddAmbient(vec3 color) {
+    vec3 albedo = texture(albedoTexture, texcoord).rgb;
+    vec3 ambient_color = albedo * ambient_light;
+    return color + ambient_color;
+}
+
+vec3 AddSun(vec3 color) {
+    vec3 real_normal = normalize(normal);
+            
+    return color + phong(real_normal, sun_direction) * sun_color;
+}
+
+vec3 MaterialColor() {
+    vec3 color = vec3(0.0);
+    color = AddAmbient(color);
+    color = AddSun(color);
+
+    return color;
+}
+
+vec3 ToneMapping(vec3 color) {
+    const float gamma = 2.2;
+
+    vec3 result = color;
+    result = ACESFilm(result);
+    result = pow(result, vec3(1.0 / gamma));
+
+    return result;
+}
+
+void main()
+{
+    // vec3 color = MaterialColor();
+    // color = ToneMapping(color);
+    const float X_LEN = 4.0;
+    const float Y_LEN = 2.0;
+    texcoord = vec2(position.x / X_LEN, position.z / Y_LEN);
+    out_color = vec4(texture(albedoTexture, texcoord).rgb, 1.0);
+}
+)";
+
+    static GLuint create_shader(GLenum type, const char * source)
+    {
+        GLuint result = glCreateShader(type);
+        glShaderSource(result, 1, &source, nullptr);
+        glCompileShader(result);
+        GLint status;
+        glGetShaderiv(result, GL_COMPILE_STATUS, &status);
+        if (status != GL_TRUE)
+        {
+            GLint info_log_length;
+            glGetShaderiv(result, GL_INFO_LOG_LENGTH, &info_log_length);
+            std::string info_log(info_log_length, '\0');
+            glGetShaderInfoLog(result, info_log.size(), nullptr, info_log.data());
+            throw std::runtime_error("Shader compilation failed: " + info_log);
+        }
+        return result;
+    }
+
+    static GLuint create_program(GLuint vertex_shader, GLuint fragment_shader)
+    {
+        GLuint result = glCreateProgram();
+        glAttachShader(result, vertex_shader);
+        glAttachShader(result, fragment_shader);
+        glLinkProgram(result);
+
+        GLint status;
+        glGetProgramiv(result, GL_LINK_STATUS, &status);
+        if (status != GL_TRUE)
+        {
+            GLint info_log_length;
+            glGetProgramiv(result, GL_INFO_LOG_LENGTH, &info_log_length);
+            std::string info_log(info_log_length, '\0');
+            glGetProgramInfoLog(result, info_log.size(), nullptr, info_log.data());
+            throw std::runtime_error("Program linkage failed: " + info_log);
+        }
+
+        return result;
+    }
+
+    GLuint program;
+
+    GLuint vao, vbo;
+
+    GLuint model_location;
+    GLuint view_location;
+    GLuint projection_location;
+
+    GLuint camera_position_location;
+
+    GLuint ambient_light_location;
+    GLuint sun_direction_location;
+    GLuint sun_color_location;
+
+    GLuint glossiness_location;
+    GLuint shininess_location;
+    GLuint albedoTexture_location;
+public:
+    glm::mat4 model, view, projection;
+    glm::vec3 camera_position;
+    glm::vec3 ambient_light, sun_color;
+    glm::vec3 sun_direction;
+    glm::vec3 glossiness;
+    float shininess;
+    GLuint albedoTexture;
+
+    PoolShader() {
+        GLuint source_vertex_shader = PoolShader::create_shader(GL_VERTEX_SHADER, vertex_shader_source);
+        GLuint source_fragment_shader = PoolShader::create_shader(GL_FRAGMENT_SHADER, fragment_shader_source);
+        program = create_program(source_vertex_shader, source_fragment_shader);
+
+        model_location = glGetUniformLocation(program, "model");
+        view_location = glGetUniformLocation(program, "view");
+        projection_location = glGetUniformLocation(program, "projection");
+        camera_position_location = glGetUniformLocation(program, "camera_position");
+        ambient_light_location = glGetUniformLocation(program, "ambient_light");
+        sun_direction_location = glGetUniformLocation(program, "sun_direction");
+        sun_color_location = glGetUniformLocation(program, "sun_color");
+        glossiness_location = glGetUniformLocation(program, "glossiness");
+        shininess_location = glGetUniformLocation(program, "shininess");
+        albedoTexture_location = glGetUniformLocation(program, "albedoTexture");
+
+        // Init vao
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)(0));
+    }
+
+    void UpdateBufferData(const std::vector<vertex> & vertices) {
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(vertex), vertices.data(), GL_STATIC_DRAW);
+    }
+
+    void Draw(const int offset, const int size) {
+        glUseProgram(program);
+        glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
+        glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
+        glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+
+        glUniform3f(camera_position_location, camera_position.x, camera_position.y, camera_position.z);
+        glUniform3f(ambient_light_location, ambient_light.x, ambient_light.y, ambient_light.z);
+        glUniform3f(sun_direction_location, sun_direction.x, sun_direction.y, sun_direction.z);
+        glUniform3f(sun_color_location, sun_color.x, sun_color.y, sun_color.z);
+        glUniform3f(glossiness_location, glossiness.x, glossiness.y, glossiness.z);
+        
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, albedoTexture);
+        glUniform1i(albedoTexture_location, 0);
+
+        glDrawArrays(GL_TRIANGLES, offset, size);
+    }
+};
