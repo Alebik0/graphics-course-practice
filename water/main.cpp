@@ -96,6 +96,9 @@ int main() try
     PoolShader poolShader = PoolShader();
     SkyboxShader skyboxShader = SkyboxShader();
     WaterShader waterShader = WaterShader();
+
+    GLuint albedoTextureID;
+    GLuint environmentTextureID;
     { // Prepare pool texture
         int texture_width, texture_height, texture_cpx;
         std::string path = project_root + "/data/pool.png";
@@ -120,7 +123,7 @@ int main() try
         glGenerateMipmap(GL_TEXTURE_2D);
         stbi_image_free(texture_pixels);
 
-        poolShader.albedoTexture = textureID;
+        albedoTextureID = textureID;
     }
     { // Prepare pool environment
         GLuint textureID;
@@ -156,18 +159,17 @@ int main() try
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-        poolShader.environmentTexture = textureID;
-        skyboxShader.environmentTexture = textureID;
+        environmentTextureID = textureID;
     }
 
     { // Put verticies
         std::vector<vertex> verticies;
-        verticies.push_back({ { -10.f, 0.f, -10.f } });
-        verticies.push_back({ { -10.f, 0.f,  10.f } });
-        verticies.push_back({ {  10.f, 0.f, -10.f } });
-        verticies.push_back({ { -10.f, 0.f,  10.f } });
-        verticies.push_back({ {  10.f, 0.f, -10.f } });
-        verticies.push_back({ {  10.f, 0.f,  10.f } });
+        verticies.push_back({ { -100.f, 0.f, -100.f } });
+        verticies.push_back({ { -100.f, 0.f,  100.f } });
+        verticies.push_back({ {  100.f, 0.f, -100.f } });
+        verticies.push_back({ { -100.f, 0.f,  100.f } });
+        verticies.push_back({ {  100.f, 0.f, -100.f } });
+        verticies.push_back({ {  100.f, 0.f,  100.f } });
         poolShader.UpdateBufferData(verticies);
     }
 
@@ -257,21 +259,16 @@ int main() try
             skyboxShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
             skyboxShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
             skyboxShader.camera_position = camera.position;
+            skyboxShader.environmentTexture = environmentTextureID;
             skyboxShader.Draw(0, 6);
         }
 
         { // Draw
             glEnable(GL_DEPTH_TEST);
-            poolShader.model = glm::mat4(1.f);
             poolShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
             poolShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
             poolShader.camera_position = camera.position;
-            poolShader.ambient_light = glm::vec3(0.1f, 0.1f, 0.05f);
-            poolShader.sun_color = glm::vec3(0.8f, 0.8f, 0.5f);
-            poolShader.sun_direction = glm::vec3(0.5f, 1.f, 0.5f);
-            poolShader.glossiness = glm::vec3(1.0f);
-            poolShader.shininess = 32.f;
-
+            poolShader.albedoTexture = albedoTextureID;
             poolShader.Draw(0, 6);
         }
 
@@ -281,7 +278,8 @@ int main() try
             waterShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
             waterShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
             waterShader.camera_position = camera.position;
-
+            waterShader.albedoTexture = albedoTextureID;
+            waterShader.environmentTexture = environmentTextureID;
             waterShader.Draw(0, mesh.size());
         }
 
