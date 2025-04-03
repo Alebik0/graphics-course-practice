@@ -341,29 +341,20 @@ vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
-vec3 ACESFilm(vec3 x)
-{
-    float a = 2.51f;
-    float b = 0.03f;
-    float c = 2.43f;
-    float d = 0.59f;
-    float e = 0.14f;
-    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
-}
-
-vec3 ToneMapping(vec3 color) {
-    const float gamma = 2.2;
-
-    vec3 result = color;
-    result = ACESFilm(result);
-    result = pow(result, vec3(1.0 / gamma));
-
-    return result;
+float Schlick(vec3 N, vec3 V) {
+    const float n1 = 1;
+    const float n2 = 1.3333;
+    float R0 = (n1 - n2) * (n1 - n2) / (n1 + n2) / (n1 + n2);
+    
+    return R0 + (1 - R0) * pow(1 - dot(N, V), 5);
 }
 
 void main()
 {
-    out_color = vec4(0.0, 0.0, (position.y - 1.0) / 2.0, 1.0);
+    vec3 N = normalize(normal);
+    vec3 V = normalize(camera_position - position);
+    float RC = Schlick(N, V);
+    out_color = vec4(0.0, 0.0, RC / 2.0, 1.0);
 }
 )";
 
