@@ -52,16 +52,59 @@ uniform sampler2D albedoTexture;
 
 in vec3 position;
 in vec3 normal;
-vec2 texcoord;
+
+uniform vec3 ambient_light;
+
+uniform vec3 sun_direction;
+uniform vec3 sun_color;
+
+uniform vec3 glossiness;
+uniform float shininess;
 
 layout (location = 0) out vec4 out_color;
+
+vec2 texcoord;
+vec3 albedo;
+vec3 real_normal;
+
+vec3 diffuse(vec3 direction) {
+    return vec3(max(0.0, dot(real_normal, direction)));
+}
+
+vec3 specular(vec3 direction) {
+    vec3 view_direction = normalize(position - camera_position);
+    vec3 reflected_direction = reflect(view_direction, real_normal);
+
+    return glossiness * pow(max(dot(reflected_direction, view_direction), 0.0), shininess);
+}
+
+vec3 phong(vec3 direction) {
+    return albedo * (diffuse(direction) + specular(direction));
+}
+
+vec3 AddAmbient(vec3 color) {
+    vec3 ambient_color = albedo * ambient_light;
+    return color + ambient_color;
+}
+
+vec3 AddSun(vec3 color) {
+    return color + phong(sun_direction) * sun_color;
+}
 
 void main()
 {
     const float X_LEN = 4.0;
     const float Y_LEN = 2.0;
+
     texcoord = vec2(position.x / X_LEN, position.z / Y_LEN);
-    out_color = vec4(texture(albedoTexture, texcoord).rgb, 1.0);
+    albedo = texture(albedoTexture, texcoord).rgb;
+    real_normal = normalize(normal);
+
+    vec3 color = vec3(0.0);
+    color = AddAmbient(color);
+    color = AddSun(color);
+
+    out_color = vec4(color, 1.0);
 }
 )";
 
@@ -112,11 +155,22 @@ void main()
     GLuint projection_location;
 
     GLuint camera_position_location;
+    
+    GLuint ambient_light_location;
+    GLuint sun_direction_location;
+    GLuint sun_color_location;
+    GLuint glossiness_location;
+    GLuint shininess_location;
 
     GLuint albedoTexture_location;
 public:
     glm::mat4 view, projection;
     glm::vec3 camera_position;
+    glm::vec3 ambient_light;
+    glm::vec3 sun_direction;
+    glm::vec3 sun_color;
+    glm::vec3 glossiness;
+    float shininess;
     GLuint albedoTexture;
 
     PoolShader() {
@@ -127,6 +181,11 @@ public:
         view_location = glGetUniformLocation(program, "view");
         projection_location = glGetUniformLocation(program, "projection");
         camera_position_location = glGetUniformLocation(program, "camera_position");
+        ambient_light_location = glGetUniformLocation(program, "ambient_light");
+        sun_direction_location = glGetUniformLocation(program, "sun_direction");
+        sun_color_location = glGetUniformLocation(program, "sun_color");
+        glossiness_location = glGetUniformLocation(program, "glossiness");
+        shininess_location = glGetUniformLocation(program, "shininess");
         albedoTexture_location = glGetUniformLocation(program, "albedoTexture");
 
         // Init vao
@@ -152,6 +211,12 @@ public:
         glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
 
         glUniform3f(camera_position_location, camera_position.x, camera_position.y, camera_position.z);
+        
+        glUniform3f(ambient_light_location, ambient_light.x, ambient_light.y, ambient_light.z);
+        glUniform3f(sun_direction_location, sun_direction.x, sun_direction.y, sun_direction.z);
+        glUniform3f(sun_color_location, sun_color.x, sun_color.y, sun_color.z);
+        glUniform3f(glossiness_location, glossiness.x, glossiness.y, glossiness.z);
+        glUniform1f(shininess_location, shininess);
         
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, albedoTexture);

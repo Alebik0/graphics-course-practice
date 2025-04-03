@@ -268,6 +268,11 @@ int main() try
             poolShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
             poolShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
             poolShader.camera_position = camera.position;
+            poolShader.ambient_light = glm::vec3(0.2f, 0.2f, 0.2f);
+            poolShader.sun_direction = glm::vec3(-2.f, 1.f, -5.f);
+            poolShader.sun_color = glm::vec3(0.6f, 0.55f, 0.4f);
+            poolShader.glossiness = glm::vec3(1.f, 1.f, 1.f);
+            poolShader.shininess = 32.f;
             poolShader.albedoTexture = albedoTextureID;
             poolShader.Draw(0, 6);
         }
