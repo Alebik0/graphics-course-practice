@@ -39,17 +39,17 @@ out vec2 texcoord;
 
 void main()
 {
-    position = in_position;
+    position    = vec3(model * vec4(in_position, 1.0));
+    normal      = mat3(transpose(inverse(model))) * in_normal;
+    texcoord    = in_texcoord;
     gl_Position = projection * view * vec4(position, 1.0);
-    normal = normalize(mat3(model) * in_normal);
-    texcoord = in_texcoord;
 }
 )";
 
     static inline char fragment_shader_source[] = 
 R"(#version 330 core
 
-vec3 albedo;
+uniform vec3 camera_position;
 
 uniform vec3 ambient_light;
 
@@ -79,22 +79,23 @@ in vec2 texcoord;
 
 layout (location = 0) out vec4 out_color;
 
-vec3 specular(vec3 direction)
-{
-    float power = roughness;
-    return glossiness * albedo * pow(max(0.0, dot(normal, direction)), power);
+vec3 diffuse(vec3 real_normal, vec3 direction) {
+    return vec3(max(0.0, dot(real_normal, direction)));
 }
 
-vec3 diffuse(vec3 direction)
-{
-    return albedo * max(0.0, dot(normal, direction));
+vec3 specular(vec3 real_normal, vec3 direction) {
+    vec3 reflected_direction = 2.0 * real_normal * dot(real_normal, direction) - direction;
+    vec3 view_direction = normalize(camera_position - position);
+    
+    return glossiness * pow(max(dot(reflected_direction, view_direction), 0.0), roughness);
 }
 
+vec3 phong(vec3 direction) {
+    vec3 albedo = texture(albedoTexture, texcoord).rgb;
+    vec3 real_normal = normalize(normal);
+    vec3 real_direction = normalize(direction);
 
-float LinearizeDepth(float depth)
-{
-    float z = depth * 2.0 - 1.0; // Back to NDC 
-    return (2.0 * 0.1 * 1000.0) / (1000.0 + 0.1 - z * (1000.0 - 0.1));
+    return albedo * (diffuse(real_normal, real_direction) + specular(real_normal, real_direction));
 }
 
 void main()
@@ -102,14 +103,13 @@ void main()
     if (hasAlphaTexture > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
         discard;
 
-    albedo = texture(albedoTexture, texcoord).rgb;
     vec3 color = vec3(0.0);
-    
-    vec3 ambient_color = albedo * ambient_light;
-    color += ambient_color;
 
-    vec3 sun_color = diffuse(sun_direction) * sun_color;
-    
+    { // Add ambient color
+        vec3 ambient_color = texture(albedoTexture, texcoord).rgb * ambient_light;
+        color += ambient_color;
+    }
+
     { // Add sun color
         vec4 ndc = shadowmap_projection * vec4(position, 1.0);
         
@@ -128,58 +128,58 @@ void main()
                 }
             }
     
-            color += sum / sum_w * sun_color;
+            color += sum / sum_w * phong(sun_direction) * sun_color;
         }
-    }  
+    }
     
-    float distance = length(point_light_position - position);
-    float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
-    float light_attenuation = 1.0 / divider;
-    vec3 light_vector = normalize(position - point_light_position);
-    vec3 light_color = (diffuse(-light_vector) + specular(-light_vector)) * light_attenuation * point_light_color;
-    
-    for (int i = 0; i < 6; i++) { // Add light color
-        mat4 projection = light_shadowmap_projection[i];
+    { // Add light color
+        float distance = length(point_light_position - position);
+        float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
+        float light_attenuation = 1.0 / divider;
+        vec3 light_vector = normalize(point_light_position - position);
         
-        vec4 ndc = projection * vec4(position, 1.0);
-        vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
-        
-        if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
-            shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
+        for (int i = 0; i < 6; i++) {
+            mat4 projection = light_shadowmap_projection[i];
+            vec4 ndc = projection * vec4(position, 1.0);
+            vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
+            
+            if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
+                shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
 
-            float sum = 0.0;
-            float sum_w = 0.0;
-            const int N = 5;
-            float radius = 7.0;
-            for (int x = -N; x <= N; x += 1) {
-                for (int y = -N; y <= N; y += 1) {
-                    float c = exp(-float(x * x + y * y) / (radius*radius));
-                    sum_w += c;
+                float sum = 0.0;
+                float sum_w = 0.0;
+                const int N = 5;
+                float radius = 7.0;
+                for (int x = -N; x <= N; x += 1) {
+                    for (int y = -N; y <= N; y += 1) {
+                        float c = exp(-float(x * x + y * y) / (radius*radius));
+                        sum_w += c;
 
-                    switch (i) {
-                    case 0:
-                        sum += c * texture(lightShadowmapTexture[0], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[0], 0), 1.0));
-                        break;
-                    case 1:
-                        sum += c * texture(lightShadowmapTexture[1], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[1], 0), 1.0));
-                        break;
-                    case 2:
-                        sum += c * texture(lightShadowmapTexture[2], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[2], 0), 1.0));
-                        break;
-                    case 3:
-                        sum += c * texture(lightShadowmapTexture[3], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[3], 0), 1.0));
-                        break;
-                    case 4:
-                        sum += c * texture(lightShadowmapTexture[4], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[4], 0), 1.0));
-                        break;
-                    case 5:
-                        sum += c * texture(lightShadowmapTexture[5], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[5], 0), 1.0));
-                        break;
+                        switch (i) {
+                        case 0:
+                            sum += c * texture(lightShadowmapTexture[0], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[0], 0), 1.0));
+                            break;
+                        case 1:
+                            sum += c * texture(lightShadowmapTexture[1], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[1], 0), 1.0));
+                            break;
+                        case 2:
+                            sum += c * texture(lightShadowmapTexture[2], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[2], 0), 1.0));
+                            break;
+                        case 3:
+                            sum += c * texture(lightShadowmapTexture[3], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[3], 0), 1.0));
+                            break;
+                        case 4:
+                            sum += c * texture(lightShadowmapTexture[4], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[4], 0), 1.0));
+                            break;
+                        case 5:
+                            sum += c * texture(lightShadowmapTexture[5], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[5], 0), 1.0));
+                            break;
+                        }
                     }
                 }
+        
+                color += sum / sum_w * phong(light_vector) * light_attenuation * point_light_color;
             }
-    
-            color += sum / sum_w * light_color;
         }
     }
 
@@ -192,6 +192,8 @@ void main()
     GLuint model_location;
     GLuint view_location;
     GLuint projection_location;
+
+    GLuint camera_position_location;
 
     GLuint ambient_light_location;
 
@@ -280,6 +282,7 @@ public:
         model_location = glGetUniformLocation(program, "model");
         view_location = glGetUniformLocation(program, "view");
         projection_location = glGetUniformLocation(program, "projection");
+        camera_position_location = glGetUniformLocation(program, "camera_position");
         ambient_light_location = glGetUniformLocation(program, "ambient_light");
         sun_direction_location = glGetUniformLocation(program, "sun_direction");
         sun_color_location = glGetUniformLocation(program, "sun_color");
@@ -334,6 +337,8 @@ public:
         glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
         glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
         glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+
+        glUniform3f(camera_position_location, camera.position.x, camera.position.y, camera.position.z);
 
         glUniform3f(ambient_light_location, ambient_light.r, ambient_light.g, ambient_light.b);
         
