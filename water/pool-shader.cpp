@@ -316,7 +316,7 @@ float WaterLevel(float x, float y, float time) {
 }
 
 vec3 WaterNormal(float x, float y, float time) {
-    return vec3(-cos(x + time * 0.3), 0.f, 1.f);
+    return vec3(-cos(x + time * 0.3), 1.f, 0.f);
 }
 
 void main()
@@ -346,15 +346,42 @@ float Schlick(vec3 N, vec3 V) {
     const float n2 = 1.3333;
     float R0 = (n1 - n2) * (n1 - n2) / (n1 + n2) / (n1 + n2);
     
-    return R0 + (1 - R0) * pow(1 - dot(N, V), 5);
+    return R0 + (1 - R0) * pow(1.0 - dot(N, V), 5);
+}
+
+vec3 Snell(vec3 N, vec3 V) {
+    const float n1 = 1.0;
+    const float n2 = 1.3333;
+    float BigSqrt = sqrt(
+        (n2 * n2 - n1 * n1) / dot(V, N) / dot(V, N)
+        + 1 
+    );
+    vec3 v2 = V + (BigSqrt - 1) * dot(V, N) * N;
+
+    return v2;
 }
 
 void main()
 {
     vec3 N = normalize(normal);
     vec3 V = normalize(camera_position - position);
+    
     float RC = Schlick(N, V);
-    out_color = vec4(0.0, 0.0, RC / 2.0, 1.0);
+    
+    vec3 reflection_v = reflect(V, N);
+    vec3 reflection_color = texture(environmentTexture, reflection_v).rgb;
+
+    vec3 refraction_v = Snell(N, V);
+
+    vec3 ground_position = position + refraction_v * position.y / dot(refraction_v, vec3(0.0, -1.0, 0.0));
+    const float X_LEN = 4.0;
+    const float Y_LEN = 2.0;
+    vec2 ground_texcoord = vec2(ground_position.x / X_LEN, ground_position.z / Y_LEN);
+    vec3 refraction_color = texture(albedoTexture, ground_texcoord).rgb;
+
+    vec3 color = vec3(RC) * reflection_color + (vec3(1.0 - RC)) * refraction_color;
+
+    out_color = vec4(color, 1.0);
 }
 )";
 

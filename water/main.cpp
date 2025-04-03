@@ -175,10 +175,10 @@ int main() try
 
     std::vector<vertex> mesh;
     { // Put verticies
-        glm::vec3 A(-10.f, 0.f, -10.f);
-        glm::vec3 B(-10.f, 0.f,  10.f);
-        glm::vec3 C( 10.f, 0.f,  10.f);
-        glm::vec3 D( 10.f, 0.f, -10.f);
+        glm::vec3 A(-20.f, 0.f, -20.f);
+        glm::vec3 B(-20.f, 0.f,  20.f);
+        glm::vec3 C( 20.f, 0.f,  20.f);
+        glm::vec3 D( 20.f, 0.f, -20.f);
 
         const int MESH_DETALISATION = 100;
         const glm::vec3 X_STEP = (D - A) / glm::vec3(MESH_DETALISATION);
