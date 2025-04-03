@@ -11,10 +11,61 @@
 
 #include <array>
 
-struct Camera {
+class Camera {
+private:
+    float ROTATION_SPEED = glm::pi<float>() / 2;
+    float MOVEMENT_SPEED = 1.f;
+public:
     glm::vec3 position;
     glm::vec3 direction;
     glm::vec3 up;
+        
+    Camera() {}
+
+    void RotateLeft(const float dt) {
+        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), -ROTATION_SPEED * dt, up)) * direction;
+    }
+
+    void RotateRight(const float dt) {
+        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), ROTATION_SPEED * dt, up)) * direction;
+    }
+
+    void RotateUp(const float dt) {
+        glm::vec3 right = glm::cross(direction, up);
+        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), ROTATION_SPEED * dt, right)) * direction;
+        up = glm::mat3(glm::rotate(glm::mat4(1.0f), ROTATION_SPEED * dt, right)) * up;
+    }
+
+    void RotateDown(const float dt) {
+        glm::vec3 right = glm::cross(direction, up);
+        direction = glm::mat3(glm::rotate(glm::mat4(1.0f), -ROTATION_SPEED * dt, right)) * direction;
+        up = glm::mat3(glm::rotate(glm::mat4(1.0f), -ROTATION_SPEED * dt, right)) * up;
+    }
+
+    void MoveForward(const float dt) {
+
+    }
+
+    void MoveBackward(const float dt) {
+
+    }
+
+    void MoveLeft(const float dt) {
+
+    }
+
+    void MoveRight(const float dt) {
+
+    }
+
+    void MoveUpward(const float dt) {
+
+    }
+
+    void MoveDownward(const float dt) {
+
+    }
+
 };
 
 struct Settings {

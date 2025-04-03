@@ -74,11 +74,10 @@ int main() try
         sdl2_fail("SDL_CreateWindow: ");
 
     Settings settings = Settings();
-    Camera camera = {
-        glm::vec3(-20.f, 10.f, -10.f),
-        glm::normalize(glm::vec3(20.f, -10.f, 10.f)),
-        glm::normalize(glm::vec3(20.f, 50.f, 10.f))
-    };
+    Camera camera = Camera();
+    camera.position = glm::vec3(-20.f, 10.f, -10.f);
+    camera.direction = glm::normalize(glm::vec3(20.f, -10.f, 10.f));
+    camera.up = glm::normalize(glm::vec3(20.f, 50.f, 10.f));
     SDL_GetWindowSize(window, &settings.width, &settings.height);
 
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
@@ -245,6 +244,52 @@ int main() try
 
             if (!paused)
                 time += dt;
+
+            if (button_click[SDLK_SPACE]) {
+                paused = !paused;
+                button_click[SDLK_SPACE] = false;
+            }
+            
+            if (button_down[SDLK_LEFT]) {
+                camera.RotateLeft(dt);
+                button_down[SDLK_LEFT] = false;
+            }
+            if (button_down[SDLK_RIGHT]) {
+                camera.RotateRight(dt);
+                button_down[SDLK_RIGHT] = false;
+            }
+            if (button_down[SDLK_UP]) {
+                camera.RotateUp(dt);
+                button_down[SDLK_UP] = false;
+            }
+            if (button_down[SDLK_DOWN]) {
+                camera.RotateDown(dt);
+                button_down[SDLK_DOWN] = false;
+            }
+            if (button_down[SDLK_w]) {
+                camera.MoveForward(dt);
+                button_down[SDLK_w] = false;
+            }
+            if (button_down[SDLK_s]) {
+                camera.MoveBackward(dt);
+                button_down[SDLK_s] = false;
+            }
+            if (button_down[SDLK_a]) {
+                camera.MoveLeft(dt);
+                button_down[SDLK_a] = false;
+            }
+            if (button_down[SDLK_d]) {
+                camera.MoveRight(dt);
+                button_down[SDLK_d] = false;
+            }
+            if (button_down[SDLK_LSHIFT]) {
+                camera.MoveUpward(dt);
+                button_down[SDLK_LSHIFT] = false;
+            }
+            if (button_down[SDLK_LCTRL]) {
+                camera.MoveDownward(dt);
+                button_down[SDLK_LCTRL] = false;
+            }
         }
 
         { // Clear
