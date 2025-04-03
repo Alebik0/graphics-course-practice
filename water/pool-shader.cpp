@@ -255,6 +255,7 @@ public:
         glBindTexture(GL_TEXTURE_CUBE_MAP, environmentTexture);
         glUniform1i(environmentTexture_location, 1);
 
+        glBindVertexArray(vao);
         glDrawArrays(GL_TRIANGLES, offset, size);
     }
 };
@@ -386,6 +387,181 @@ public:
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, environmentTexture);
         glUniform1i(environmentTexture_location, 0);
+
+        glBindVertexArray(vao);
+        glDrawArrays(GL_TRIANGLES, offset, size);
+    }
+};
+
+
+class WaterShader {
+private:
+    static inline char vertex_shader_source[] =  
+R"(#version 330 core
+
+uniform float time;
+uniform mat4 view;
+uniform mat4 projection;
+
+layout (location = 0) in vec3 in_position;
+
+out vec3 position;
+out vec3 normal;
+
+float WaterLevel(float x, float y, float time) {
+    return 3.f + sin(x + time * 0.3);
+}
+
+vec3 WaterNormal(float x, float y, float time) {
+    return vec3(-cos(x + time * 0.3), 0.f, 1.f);
+}
+
+void main()
+{
+    position    = vec3(in_position.x, WaterLevel(in_position.x, in_position.z, time), in_position.z);
+    normal      = WaterNormal(in_position.x, in_position.z, time);
+    gl_Position = projection * view * vec4(position, 1.0);
+}
+)";
+
+    static inline char fragment_shader_source[] = 
+R"(#version 330 core
+
+uniform vec3 camera_position;
+
+uniform samplerCube environmentTexture;
+
+in vec3 position;
+in vec3 normal;
+vec2 texcoord;
+
+layout (location = 0) out vec4 out_color;
+
+vec3 ACESFilm(vec3 x)
+{
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
+}
+
+vec3 ToneMapping(vec3 color) {
+    const float gamma = 2.2;
+
+    vec3 result = color;
+    result = ACESFilm(result);
+    result = pow(result, vec3(1.0 / gamma));
+
+    return result;
+}
+
+void main()
+{
+    out_color = vec4(0.0, 0.0, (position.y - 1.0) / 2.0, 1.0);
+}
+)";
+
+    static GLuint create_shader(GLenum type, const char * source)
+    {
+        GLuint result = glCreateShader(type);
+        glShaderSource(result, 1, &source, nullptr);
+        glCompileShader(result);
+        GLint status;
+        glGetShaderiv(result, GL_COMPILE_STATUS, &status);
+        if (status != GL_TRUE)
+        {
+            GLint info_log_length;
+            glGetShaderiv(result, GL_INFO_LOG_LENGTH, &info_log_length);
+            std::string info_log(info_log_length, '\0');
+            glGetShaderInfoLog(result, info_log.size(), nullptr, info_log.data());
+            throw std::runtime_error("Shader compilation failed: " + info_log);
+        }
+        return result;
+    }
+
+    static GLuint create_program(GLuint vertex_shader, GLuint fragment_shader)
+    {
+        GLuint result = glCreateProgram();
+        glAttachShader(result, vertex_shader);
+        glAttachShader(result, fragment_shader);
+        glLinkProgram(result);
+
+        GLint status;
+        glGetProgramiv(result, GL_LINK_STATUS, &status);
+        if (status != GL_TRUE)
+        {
+            GLint info_log_length;
+            glGetProgramiv(result, GL_INFO_LOG_LENGTH, &info_log_length);
+            std::string info_log(info_log_length, '\0');
+            glGetProgramInfoLog(result, info_log.size(), nullptr, info_log.data());
+            throw std::runtime_error("Program linkage failed: " + info_log);
+        }
+
+        return result;
+    }
+
+    GLuint program;
+
+    GLuint vao, vbo;
+
+    GLuint time_location;
+
+    GLuint view_location;
+    GLuint projection_location;
+
+    GLuint camera_position_location;
+
+    GLuint environmentTexture_location;
+public:
+    glm::mat4 view, projection;
+    glm::vec3 camera_position;
+    GLuint environmentTexture;
+    float time;
+
+    WaterShader() {
+        GLuint source_vertex_shader = WaterShader::create_shader(GL_VERTEX_SHADER, vertex_shader_source);
+        GLuint source_fragment_shader = WaterShader::create_shader(GL_FRAGMENT_SHADER, fragment_shader_source);
+        program = create_program(source_vertex_shader, source_fragment_shader);
+
+        time_location = glGetUniformLocation(program, "time");
+        view_location = glGetUniformLocation(program, "view");
+        projection_location = glGetUniformLocation(program, "projection");
+        camera_position_location = glGetUniformLocation(program, "camera_position");
+        environmentTexture_location = glGetUniformLocation(program, "environmentTexture");
+
+        // Init vao
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)(0));
+    }
+
+    void UpdateBufferData(const std::vector<vertex> & vertices) {
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(vertex), vertices.data(), GL_STATIC_DRAW);
+    }
+
+    void Draw(const int offset, const int size) {
+        glUseProgram(program);
+        
+        glUniform1f(time_location, time);
+        glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
+        glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+
+        glUniform3f(camera_position_location, camera_position.x, camera_position.y, camera_position.z);
+        
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, environmentTexture);
+        glUniform1i(environmentTexture_location, 0);
+
+        glBindVertexArray(vao);
 
         glDrawArrays(GL_TRIANGLES, offset, size);
     }

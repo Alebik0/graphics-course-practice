@@ -95,6 +95,7 @@ int main() try
 
     PoolShader poolShader = PoolShader();
     SkyboxShader skyboxShader = SkyboxShader();
+    WaterShader waterShader = WaterShader();
     { // Prepare pool texture
         int texture_width, texture_height, texture_cpx;
         std::string path = project_root + "/data/pool.png";
@@ -170,6 +171,36 @@ int main() try
         poolShader.UpdateBufferData(verticies);
     }
 
+    std::vector<vertex> mesh;
+    { // Put verticies
+        glm::vec3 A(-10.f, 0.f, -10.f);
+        glm::vec3 B(-10.f, 0.f,  10.f);
+        glm::vec3 C( 10.f, 0.f,  10.f);
+        glm::vec3 D( 10.f, 0.f, -10.f);
+
+        const int MESH_DETALISATION = 100;
+        const glm::vec3 X_STEP = (D - A) / glm::vec3(MESH_DETALISATION);
+        const glm::vec3 Z_STEP = (B - A) / glm::vec3(MESH_DETALISATION);
+        for (int i = 0; i < 100; i++) {
+            for (int j = 0; j < 100; j++) {
+                glm::vec3 a = A + X_STEP * (float) i + Z_STEP * (float) j;
+                glm::vec3 b = a + Z_STEP;
+                glm::vec3 d = a + X_STEP;
+                glm::vec3 c = a + X_STEP + Z_STEP;
+
+                float time = 0.f;
+                mesh.push_back({ { a.x, 0.f, a.z } });
+                mesh.push_back({ { b.x, 0.f, b.z } });
+                mesh.push_back({ { d.x, 0.f, d.z } });
+                mesh.push_back({ { b.x, 0.f, b.z } });
+                mesh.push_back({ { d.x, 0.f, d.z } });
+                mesh.push_back({ { c.x, 0.f, c.z } });
+            }
+        }
+        waterShader.UpdateBufferData(mesh);
+    }
+
+    bool paused = false;
     float time = 0.f;
 
     auto last_frame_start = std::chrono::high_resolution_clock::now();
@@ -209,6 +240,9 @@ int main() try
             auto now = std::chrono::high_resolution_clock::now();
             float dt = std::chrono::duration_cast<std::chrono::duration<float>>(now - last_frame_start).count();
             last_frame_start = now;
+
+            if (!paused)
+                time += dt;
         }
 
         { // Clear
@@ -239,6 +273,16 @@ int main() try
             poolShader.shininess = 32.f;
 
             poolShader.Draw(0, 6);
+        }
+
+        { // Draw water
+            glEnable(GL_DEPTH_TEST);
+            waterShader.time = time;
+            waterShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
+            waterShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
+            waterShader.camera_position = camera.position;
+
+            waterShader.Draw(0, mesh.size());
         }
 
         SDL_GL_SwapWindow(window);
