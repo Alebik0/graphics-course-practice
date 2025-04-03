@@ -75,9 +75,9 @@ int main() try
 
     Settings settings = Settings();
     Camera camera = {
-        glm::vec3(-10.f, 10.f, -10.f),
-        glm::vec3(10.f, -10.f, 10.f),
-        glm::vec3(5.f, 10.f, 5.f),
+        glm::vec3(-20.f, 10.f, -10.f),
+        glm::normalize(glm::vec3(20.f, -10.f, 10.f)),
+        glm::normalize(glm::vec3(20.f, 50.f, 10.f))
     };
     SDL_GetWindowSize(window, &settings.width, &settings.height);
 
