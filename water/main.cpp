@@ -94,6 +94,7 @@ int main() try
     std::string project_root = PROJECT_ROOT;
 
     PoolShader poolShader = PoolShader();
+    SkyboxShader skyboxShader = SkyboxShader();
     { // Prepare pool texture
         int texture_width, texture_height, texture_cpx;
         std::string path = project_root + "/data/pool.png";
@@ -120,6 +121,44 @@ int main() try
 
         poolShader.albedoTexture = textureID;
     }
+    { // Prepare pool environment
+        GLuint textureID;
+        glGenTextures(1, &textureID);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+        std::vector<std::string> faces = {
+            "/data/clouds/clouds1_north.bmp",
+            "/data/clouds/clouds1_south.bmp",
+            "/data/clouds/clouds1_up.bmp",
+            "/data/clouds/clouds1_down.bmp",
+            "/data/clouds/clouds1_west.bmp",
+            "/data/clouds/clouds1_east.bmp"
+        };
+        int width, height, nrChannels;
+        for (unsigned int i = 0; i < faces.size(); i++)
+        {
+            unsigned char *data = stbi_load((project_root + faces[i]).c_str(), &width, &height, &nrChannels, 0);
+
+            if (data) {
+                std::cout << "Loaded " << (project_root + faces[i]) << ": " << width << 'x' << height << std::endl;
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+                stbi_image_free(data);
+            } else {
+                std::cout << "Cubemap tex failed to load at path: " << faces[i] << std::endl;
+                stbi_image_free(data);
+            }
+        }
+
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        poolShader.environmentTexture = textureID;
+        skyboxShader.environmentTexture = textureID;
+    }
+
     { // Put verticies
         std::vector<vertex> verticies;
         verticies.push_back({ { -10.f, 0.f, -10.f } });
@@ -177,10 +216,18 @@ int main() try
             glClearColor(settings.clear_r, settings.clear_g, settings.clear_b, 1.0f);
             glViewport(0, 0, settings.width, settings.height);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            glEnable(GL_DEPTH_TEST);
+        }
+
+        { // Draw skybox
+            glDisable(GL_DEPTH_TEST);
+            skyboxShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
+            skyboxShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
+            skyboxShader.camera_position = camera.position;
+            skyboxShader.Draw(0, 6);
         }
 
         { // Draw
+            glEnable(GL_DEPTH_TEST);
             poolShader.model = glm::mat4(1.f);
             poolShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
             poolShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
