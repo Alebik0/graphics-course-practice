@@ -119,6 +119,12 @@ GLuint create_program(GLuint vertex_shader, GLuint fragment_shader)
     return result;
 }
 
+
+const float scale = 0.5f;
+const float near = 0.1f;
+const float far = 10.f;
+const float right = 0.1f;
+
 int main() try
 {
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
@@ -158,6 +164,7 @@ int main() try
         throw std::runtime_error("OpenGL 3.3 is not supported");
 
     glClearColor(0.1f, 0.1f, 0.2f, 0.f);
+    glEnable(GL_DEPTH_TEST);
 
     auto vertex_shader = create_shader(GL_VERTEX_SHADER, vertex_shader_source);
     auto fragment_shader = create_shader(GL_FRAGMENT_SHADER, fragment_shader_source);
@@ -170,9 +177,42 @@ int main() try
     std::string project_root = PROJECT_ROOT;
     obj_data bunny = parse_obj(project_root + "/bunny.obj");
 
+    // Gen vao, vbo, ebo:
+    GLuint vao, vbo, ebo;
+
+    // Bunny parameters:
+    float bunny_offset_xs[3] = { 1.f, -1.f, -1.f };
+    float bunny_offset_ys[3] = { 0.75f, 0.75f, -0.75f };
+
+    // VBO settings:
+    const int position_index = 0;
+    const int normal_index = 1;
+
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
+
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glEnableVertexAttribArray(position_index);
+    glEnableVertexAttribArray(normal_index);
+    glVertexAttribPointer(position_index, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void *)(0));
+    glVertexAttribPointer(normal_index, 3, GL_FLOAT, GL_FALSE, sizeof(obj_data::vertex), (void *)(sizeof(std::array<float, 3>)));
+
+    // Set up buffer data:
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, bunny.vertices.size() * sizeof(obj_data::vertex), bunny.vertices.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, bunny.indices.size() * sizeof(std::uint32_t), bunny.indices.data(), GL_STATIC_DRAW);
+
+    // Draw loop:
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
     float time = 0.f;
+    float bunny_x = 0.f;
+    float bunny_y = 0.f;
+    float speed = 1.f;
 
     std::map<SDL_Keycode, bool> button_down;
 
@@ -204,41 +244,79 @@ int main() try
         if (!running)
             break;
 
+        // Frame properties:
         auto now = std::chrono::high_resolution_clock::now();
         float dt = std::chrono::duration_cast<std::chrono::duration<float>>(now - last_frame_start).count();
         last_frame_start = now;
         time += dt;
+        float angle = time;
+        float aspect_ratio = ((float) width) / height;
+        float top = right / aspect_ratio;
 
-        glClear(GL_COLOR_BUFFER_BIT);
+        // Buttons press check:
+        if (button_down[SDLK_LEFT]) {
+            bunny_x -= speed * dt;
+        }
+        if (button_down[SDLK_RIGHT]) {
+            bunny_x += speed * dt;
+        }
+        if (button_down[SDLK_UP]) {
+            bunny_y += speed * dt;
+        }
+        if (button_down[SDLK_DOWN]) {
+            bunny_y -= speed * dt;
+        }
 
-        float model[16] =
-        {
-            1.f, 0.f, 0.f, 0.f,
-            0.f, 1.f, 0.f, 0.f,
-            0.f, 0.f, 1.f, 0.f,
-            0.f, 0.f, 0.f, 1.f,
+        // Draw frame:
+        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+        glUseProgram(program);
+
+        float models[3][16] = {
+            {
+                cos(angle) * scale, 0.f, -sin(angle) * scale, bunny_offset_xs[0] + bunny_x,
+                0.f, scale, 0.f, bunny_offset_ys[0] + bunny_y,
+                sin(angle) * scale, 0.f, cos(angle) * scale, 0.f,
+                0.f, 0.f, 0.f, 1.f
+            },
+            {
+                cos(angle) * scale, -sin(angle) * scale, 0.f, bunny_offset_xs[1] + bunny_x,
+                sin(angle) * scale, cos(angle) * scale, 0.f, bunny_offset_ys[1] + bunny_y,
+                0.f, 0.f, scale, 0.f,
+                0.f, 0.f, 0.f, 1.f
+            },
+            {
+                scale, 0.f, 0.f, bunny_offset_xs[2] + bunny_x,
+                0.f, cos(angle) * scale, -sin(angle) * scale, bunny_offset_ys[2] + bunny_y,
+                0.f, sin(angle) * scale, cos(angle) * scale, 0.f,
+                0.f, 0.f, 0.f, 1.f
+            }
         };
 
         float view[16] =
         {
             1.f, 0.f, 0.f, 0.f,
             0.f, 1.f, 0.f, 0.f,
-            0.f, 0.f, 1.f, 0.f,
+            0.f, 0.f, 1.f, -3.f,
             0.f, 0.f, 0.f, 1.f,
         };
 
         float projection[16] =
         {
-            1.f, 0.f, 0.f, 0.f,
-            0.f, 1.f, 0.f, 0.f,
-            0.f, 0.f, 1.f, 0.f,
-            0.f, 0.f, 0.f, 1.f,
+            near / right, 0.f, 0.f, 0.f,
+            0.f, near / top, 0.f, 0.f,
+            0.f, 0.f, - (far + near) / (far - near), -2 * far * near / (far - near),
+            0.f, 0.f, -1.f, 0.f
         };
 
-        glUseProgram(program);
-        glUniformMatrix4fv(model_location, 1, GL_TRUE, model);
-        glUniformMatrix4fv(view_location, 1, GL_TRUE, view);
-        glUniformMatrix4fv(projection_location, 1, GL_TRUE, projection);
+
+        for (int i = 0; i < 3; i++) {
+            glUniformMatrix4fv(model_location, 1, GL_TRUE, models[i]);
+            glUniformMatrix4fv(view_location, 1, GL_TRUE, view);
+            glUniformMatrix4fv(projection_location, 1, GL_TRUE, projection);
+            glBindVertexArray(vao);
+            glDrawElements(GL_TRIANGLES, bunny.indices.size(), GL_UNSIGNED_INT, (void *)(0));
+        }
 
         SDL_GL_SwapWindow(window);
     }
