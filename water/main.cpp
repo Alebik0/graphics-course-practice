@@ -1,0 +1,357 @@
+#ifdef WIN32
+#include <SDL.h>
+#undef main
+#else
+#include <SDL2/SDL.h>
+#endif
+
+#include <GL/glew.h>
+
+#include <string_view>
+#include <stdexcept>
+#include <iostream>
+#include <chrono>
+#include <vector>
+#include <map>
+#include <cmath>
+#include <fstream>
+#include <sstream>
+#include <string>
+
+#define GLM_FORCE_SWIZZLE
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/scalar_constants.hpp>
+#include <glm/gtx/string_cast.hpp>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+#include <vector>
+#include <array>
+#include "data.hpp"
+#include "pool-shader.cpp"
+
+std::string to_string(std::string_view str)
+{
+    return std::string(str.begin(), str.end());
+}
+
+void sdl2_fail(std::string_view message)
+{
+    throw std::runtime_error(to_string(message) + SDL_GetError());
+}
+
+void glew_fail(std::string_view message, GLenum error)
+{
+    throw std::runtime_error(to_string(message) + reinterpret_cast<const char *>(glewGetErrorString(error)));
+}
+
+int main() try
+{
+    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+        sdl2_fail("SDL_Init: ");
+
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+
+    SDL_Window * window = SDL_CreateWindow("Graphics course practice 9",
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        800, 600,
+        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED);
+
+    if (!window)
+        sdl2_fail("SDL_CreateWindow: ");
+
+    Settings settings = Settings();
+    Camera camera = Camera();
+    camera.position = glm::vec3(-20.f, 10.f, -10.f);
+    camera.direction = glm::normalize(glm::vec3(20.f, -10.f, 10.f));
+    camera.up = glm::normalize(glm::vec3(20.f, 50.f, 10.f));
+    SDL_GetWindowSize(window, &settings.width, &settings.height);
+
+    SDL_GLContext gl_context = SDL_GL_CreateContext(window);
+    if (!gl_context)
+        sdl2_fail("SDL_GL_CreateContext: ");
+
+    if (auto result = glewInit(); result != GLEW_NO_ERROR)
+        glew_fail("glewInit: ", result);
+
+    if (!GLEW_VERSION_3_3)
+        throw std::runtime_error("OpenGL 3.3 is not supported");
+
+    std::string project_root = PROJECT_ROOT;
+
+    PoolShader poolShader = PoolShader();
+    SkyboxShader skyboxShader = SkyboxShader();
+    WaterShader waterShader = WaterShader();
+
+    GLuint albedoTextureID;
+    GLuint environmentTextureID;
+    { // Prepare pool texture
+        int texture_width, texture_height, texture_cpx;
+        std::string path = project_root + "/data/pool.png";
+        unsigned char * texture_pixels = stbi_load(
+            path.c_str(),
+            &texture_width,
+            &texture_height,
+            &texture_cpx,
+            4);
+
+        GLuint textureID;
+        glGenTextures(1, &textureID);
+        glBindTexture(GL_TEXTURE_2D, textureID);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_MIRRORED_REPEAT);
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB_ALPHA, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_pixels);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        stbi_image_free(texture_pixels);
+
+        albedoTextureID = textureID;
+    }
+    { // Prepare pool environment
+        GLuint textureID;
+        glGenTextures(1, &textureID);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+        std::vector<std::string> faces = {
+            "/data/clouds/clouds1_north.bmp",
+            "/data/clouds/clouds1_south.bmp",
+            "/data/clouds/clouds1_up.bmp",
+            "/data/clouds/clouds1_down.bmp",
+            "/data/clouds/clouds1_west.bmp",
+            "/data/clouds/clouds1_east.bmp"
+        };
+        int width, height, nrChannels;
+        for (unsigned int i = 0; i < faces.size(); i++)
+        {
+            unsigned char *data = stbi_load((project_root + faces[i]).c_str(), &width, &height, &nrChannels, 0);
+
+            if (data) {
+                std::cout << "Loaded " << (project_root + faces[i]) << ": " << width << 'x' << height << std::endl;
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+                stbi_image_free(data);
+            } else {
+                std::cout << "Cubemap tex failed to load at path: " << faces[i] << std::endl;
+                stbi_image_free(data);
+            }
+        }
+
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        environmentTextureID = textureID;
+    }
+
+    { // Put verticies
+        std::vector<vertex> verticies;
+        verticies.push_back({ { -100.f, 0.f, -100.f } });
+        verticies.push_back({ { -100.f, 0.f,  100.f } });
+        verticies.push_back({ {  100.f, 0.f, -100.f } });
+        verticies.push_back({ { -100.f, 0.f,  100.f } });
+        verticies.push_back({ {  100.f, 0.f, -100.f } });
+        verticies.push_back({ {  100.f, 0.f,  100.f } });
+        poolShader.UpdateBufferData(verticies);
+    }
+
+    std::vector<vertex> mesh;
+    { // Put verticies
+        glm::vec3 A(-20.f, 0.f, -20.f);
+        glm::vec3 B(-20.f, 0.f,  20.f);
+        glm::vec3 C( 20.f, 0.f,  20.f);
+        glm::vec3 D( 20.f, 0.f, -20.f);
+
+        const int MESH_DETALISATION = 100;
+        const glm::vec3 X_STEP = (D - A) / glm::vec3(MESH_DETALISATION);
+        const glm::vec3 Z_STEP = (B - A) / glm::vec3(MESH_DETALISATION);
+        for (int i = 0; i < 100; i++) {
+            for (int j = 0; j < 100; j++) {
+                glm::vec3 a = A + X_STEP * (float) i + Z_STEP * (float) j;
+                glm::vec3 b = a + Z_STEP;
+                glm::vec3 d = a + X_STEP;
+                glm::vec3 c = a + X_STEP + Z_STEP;
+
+                float time = 0.f;
+                mesh.push_back({ { a.x, 0.f, a.z } });
+                mesh.push_back({ { b.x, 0.f, b.z } });
+                mesh.push_back({ { d.x, 0.f, d.z } });
+                mesh.push_back({ { b.x, 0.f, b.z } });
+                mesh.push_back({ { d.x, 0.f, d.z } });
+                mesh.push_back({ { c.x, 0.f, c.z } });
+            }
+        }
+        waterShader.UpdateBufferData(mesh);
+    }
+
+    bool paused = false;
+    float time = 0.f;
+
+    auto last_frame_start = std::chrono::high_resolution_clock::now();
+    
+    std::map<SDL_Keycode, bool> button_down;
+    std::map<SDL_Keycode, bool> button_click;
+
+    bool running = true;
+    while (running)
+    {
+        for (SDL_Event event; SDL_PollEvent(&event);) switch (event.type)
+        {
+        case SDL_QUIT:
+            running = false;
+            break;
+        case SDL_WINDOWEVENT: switch (event.window.event)
+            {
+            case SDL_WINDOWEVENT_RESIZED:
+                settings.width = event.window.data1;
+                settings.height = event.window.data2;
+                break;
+            }
+            break;
+        case SDL_KEYDOWN:
+            button_click[event.key.keysym.sym] = !button_down[event.key.keysym.sym];
+            button_down[event.key.keysym.sym] = true;
+            break;
+        case SDL_KEYUP:
+            button_down[event.key.keysym.sym] = false;
+            break;
+        }
+
+        if (!running)
+            break;
+        
+        { // Update camera position
+            auto now = std::chrono::high_resolution_clock::now();
+            float dt = std::chrono::duration_cast<std::chrono::duration<float>>(now - last_frame_start).count();
+            last_frame_start = now;
+
+            if (!paused)
+                time += dt;
+
+            if (button_click[SDLK_SPACE]) {
+                paused = !paused;
+                button_click[SDLK_SPACE] = false;
+            }
+            
+            if (button_down[SDLK_LEFT]) {
+                camera.RotateLeft(dt);
+                button_down[SDLK_LEFT] = false;
+            }
+            if (button_down[SDLK_RIGHT]) {
+                camera.RotateRight(dt);
+                button_down[SDLK_RIGHT] = false;
+            }
+            if (button_down[SDLK_UP]) {
+                camera.RotateUp(dt);
+                button_down[SDLK_UP] = false;
+            }
+            if (button_down[SDLK_DOWN]) {
+                camera.RotateDown(dt);
+                button_down[SDLK_DOWN] = false;
+            }
+            if (button_down[SDLK_w]) {
+                camera.MoveForward(dt);
+                button_down[SDLK_w] = false;
+            }
+            if (button_down[SDLK_s]) {
+                camera.MoveBackward(dt);
+                button_down[SDLK_s] = false;
+            }
+            if (button_down[SDLK_a]) {
+                camera.MoveLeft(dt);
+                button_down[SDLK_a] = false;
+            }
+            if (button_down[SDLK_d]) {
+                camera.MoveRight(dt);
+                button_down[SDLK_d] = false;
+            }
+            if (button_down[SDLK_LSHIFT]) {
+                camera.MoveUpward(dt);
+                button_down[SDLK_LSHIFT] = false;
+            }
+            if (button_down[SDLK_LCTRL]) {
+                camera.MoveDownward(dt);
+                button_down[SDLK_LCTRL] = false;
+            }
+        }
+
+        { // Clear
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            glClearColor(settings.clear_r, settings.clear_g, settings.clear_b, 1.0f);
+            glViewport(0, 0, settings.width, settings.height);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
+
+        { // Draw skybox
+            glDisable(GL_DEPTH_TEST);
+            skyboxShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
+            skyboxShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
+            skyboxShader.camera_position = camera.position;
+            skyboxShader.environmentTexture = environmentTextureID;
+            skyboxShader.Draw(0, 6);
+        }
+
+        glm::vec3 ambient_light = glm::vec3(0.2f, 0.2f, 0.2f);
+        glm::vec3 sun_direction = glm::vec3(2.f, 1.f, 5.f);
+        glm::vec3 sun_color = glm::vec3(0.8f, 0.7f, 0.4f);
+        glm::vec3 glossiness = glm::vec3(1.4f);
+        float shininess = 32.f;
+
+        { // Draw
+            glEnable(GL_DEPTH_TEST);
+            poolShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
+            poolShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
+            poolShader.camera_position = camera.position;
+            poolShader.ambient_light = ambient_light;
+            poolShader.sun_direction = sun_direction;
+            poolShader.sun_color = sun_color;
+            poolShader.glossiness = glossiness;
+            poolShader.shininess = shininess;
+            poolShader.albedoTexture = albedoTextureID;
+            poolShader.Draw(0, 6);
+        }
+
+        { // Draw water
+            glEnable(GL_DEPTH_TEST);
+            waterShader.time = time;
+            waterShader.view = glm::lookAt(camera.position, camera.position + camera.direction, glm::normalize(camera.up));
+            waterShader.projection = glm::perspective(glm::pi<float>() / 2, (1.f * settings.width) / settings.height, settings.near, settings.far);
+            waterShader.camera_position = camera.position;
+            waterShader.ambient_light = ambient_light;
+            waterShader.sun_direction = sun_direction;
+            waterShader.sun_color = sun_color;
+            waterShader.glossiness = glossiness;
+            waterShader.shininess = shininess;
+            waterShader.albedoTexture = albedoTextureID;
+            waterShader.environmentTexture = environmentTextureID;
+            waterShader.Draw(0, mesh.size());
+        }
+
+        SDL_GL_SwapWindow(window);
+    }
+
+    SDL_GL_DeleteContext(gl_context);
+    SDL_DestroyWindow(window);
+}
+catch (std::exception const & e)
+{
+    std::cerr << e.what() << std::endl;
+    return EXIT_FAILURE;
+}

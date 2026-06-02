@@ -91,6 +91,7 @@ vec3 diffuse(vec3 real_normal, vec3 direction) {
 vec3 specular(vec3 real_normal, vec3 direction) {
     vec3 reflected_direction = 2.0 * real_normal * dot(real_normal, direction) - direction;
     vec3 view_direction = normalize(camera_position - position);
+<<<<<<< HEAD:homework3/shaders.hpp
     float spec = pow(max(dot(reflected_direction, view_direction), 0.0), shininess);
     
     if (has_specular > 0.5)
@@ -202,12 +203,110 @@ vec3 ToneMapping(vec3 color) {
         result = pow(result, vec3(1.0 / gamma));
 
     return result;
+=======
+    
+    return glossiness * pow(max(dot(reflected_direction, view_direction), 0.0), roughness);
+}
+
+vec3 phong(vec3 direction) {
+    vec3 albedo = texture(albedoTexture, texcoord).rgb;
+    vec3 real_normal = normalize(normal);
+    vec3 real_direction = normalize(direction);
+
+    return albedo * (diffuse(real_normal, real_direction) + specular(real_normal, real_direction));
+>>>>>>> master:homework2/shaders.hpp
 }
 
 void main()
 {
+<<<<<<< HEAD:homework3/shaders.hpp
     vec3 color = MaterialColor();
     color = ToneMapping(color);
+=======
+    if (hasAlphaTexture > 0.5 && texture(alphaTexture, texcoord).r < 0.5)
+        discard;
+
+    vec3 color = vec3(0.0);
+
+    { // Add ambient color
+        vec3 ambient_color = texture(albedoTexture, texcoord).rgb * ambient_light;
+        color += ambient_color;
+    }
+
+    { // Add sun color
+        vec4 ndc = shadowmap_projection * vec4(position, 1.0);
+        
+        if (abs(ndc.x) <= 1 && abs(ndc.y) <= 1) {
+            vec3 shadowmap_texcoord = ndc.xyz * 0.5 + 0.5;
+            
+            float sum = 0.0;
+            float sum_w = 0.0;
+            const int N = 5;
+            float radius = 7.0;
+            for (int x = -N; x <= N; x += 1) {
+                for (int y = -N; y <= N; y += 1) {
+                    float c = exp(-float(x * x + y * y) / (radius*radius));
+                    sum_w += c;
+                    sum += c * texture(shadowmapTexture, shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(shadowmapTexture, 0), 1.0));
+                }
+            }
+    
+            color += sum / sum_w * phong(sun_direction) * sun_color;
+        }
+    }
+    
+    { // Add light color
+        float distance = length(point_light_position - position);
+        float divider = point_light_attenuation.x + distance * point_light_attenuation.y + distance * distance * point_light_attenuation.z;
+        float light_attenuation = 1.0 / divider;
+        vec3 light_vector = normalize(point_light_position - position);
+        
+        for (int i = 0; i < 6; i++) {
+            mat4 projection = light_shadowmap_projection[i];
+            vec4 ndc = projection * vec4(position, 1.0);
+            vec3 shadowmap_texcoord = ndc.xyz / ndc.w;
+            
+            if (ndc.z > 0 && abs(shadowmap_texcoord.x) < 1 && abs(shadowmap_texcoord.y) < 1) {
+                shadowmap_texcoord = shadowmap_texcoord * 0.5 + 0.5;
+
+                float sum = 0.0;
+                float sum_w = 0.0;
+                const int N = 5;
+                float radius = 7.0;
+                for (int x = -N; x <= N; x += 1) {
+                    for (int y = -N; y <= N; y += 1) {
+                        float c = exp(-float(x * x + y * y) / (radius*radius));
+                        sum_w += c;
+
+                        switch (i) {
+                        case 0:
+                            sum += c * texture(lightShadowmapTexture[0], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[0], 0), 1.0));
+                            break;
+                        case 1:
+                            sum += c * texture(lightShadowmapTexture[1], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[1], 0), 1.0));
+                            break;
+                        case 2:
+                            sum += c * texture(lightShadowmapTexture[2], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[2], 0), 1.0));
+                            break;
+                        case 3:
+                            sum += c * texture(lightShadowmapTexture[3], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[3], 0), 1.0));
+                            break;
+                        case 4:
+                            sum += c * texture(lightShadowmapTexture[4], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[4], 0), 1.0));
+                            break;
+                        case 5:
+                            sum += c * texture(lightShadowmapTexture[5], shadowmap_texcoord + vec3(x, y, 0.0) / vec3(textureSize(lightShadowmapTexture[5], 0), 1.0));
+                            break;
+                        }
+                    }
+                }
+        
+                color += sum / sum_w * phong(light_vector) * light_attenuation * point_light_color;
+            }
+        }
+    }
+
+>>>>>>> master:homework2/shaders.hpp
     out_color = vec4(color, 1.0);
 }
 )";

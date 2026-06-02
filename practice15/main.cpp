@@ -48,20 +48,53 @@ R"(#version 330 core
 
 uniform mat4 transform;
 
+layout (location = 0) in vec2 in_position;
+layout (location = 1) in vec2 in_texcoord;
+
+out vec2 texcoord;
+
 void main()
 {
-    gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+    gl_Position = transform * vec4(in_position, 0.0, 1.0);
+    texcoord = in_texcoord;
 }
 )";
 
 const char msdf_fragment_shader_source[] =
 R"(#version 330 core
 
+uniform float sdf_scale;
+uniform sampler2D sdf_texture;
+
 layout (location = 0) out vec4 out_color;
+
+in vec2 texcoord;
+
+float median(vec3 v) {
+    return max(min(v.r, v.g), min(max(v.r, v.g), v.b));
+}
 
 void main()
 {
-    out_color = vec4(0.0);
+    float textureValue = median(texture(sdf_texture, texcoord).rgb);
+    float sdfValue = sdf_scale * (textureValue - 0.5);
+    float smoothValue = length(vec2(dFdx(sdfValue), dFdy(sdfValue))) / sqrt(2.0);
+    float borderSize = 0.75;
+    float alpha = smoothstep(-smoothValue, smoothValue, sdfValue + borderSize);
+    vec3 textColor = vec3(0.f);
+    vec3 borderColor = vec3(1.f);
+    vec3 color;
+
+    if (sdfValue < -smoothValue) {
+        color = borderColor;
+    } else if (sdfValue > smoothValue) {
+        color = textColor;
+    } else {
+        float mix_power = smoothstep(-smoothValue, smoothValue, sdfValue);
+        color = mix(borderColor, textColor, mix_power);
+    }
+
+    out_color = vec4(color, alpha);
 }
 )";
 
@@ -145,6 +178,8 @@ int main() try
     auto msdf_program = create_program(msdf_vertex_shader, msdf_fragment_shader);
 
     GLuint transform_location = glGetUniformLocation(msdf_program, "transform");
+    GLuint sdf_scale_location = glGetUniformLocation(msdf_program, "sdf_scale");
+    
 
     const std::string project_root = PROJECT_ROOT;
     const std::string font_path = project_root + "/font/font-msdf.json";
@@ -168,6 +203,23 @@ int main() try
         stbi_image_free(data);
     }
 
+    GLuint vao;
+    GLuint vbo_position, vbo_texcoord;
+    { // Init vao, vbo
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+
+        glGenBuffers(1, &vbo_position);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_position);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), reinterpret_cast<void *>(0));
+
+        glGenBuffers(1, &vbo_texcoord);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_texcoord);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), reinterpret_cast<void *>(0));
+    }
+
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
     float time = 0.f;
@@ -180,6 +232,12 @@ int main() try
     bool text_changed = true;
 
     bool running = true;
+
+    glm::vec2 bbox_min;
+    glm::vec2 bbox_max;
+    std::vector<glm::vec2> positions;
+    std::vector<glm::vec2> texcoords;
+
     while (running)
     {
         for (SDL_Event event; SDL_PollEvent(&event);) switch (event.type)
@@ -215,9 +273,72 @@ int main() try
         if (!running)
             break;
 
+        if (text_changed) { // Put some data to vbo
+            bbox_min = glm::vec2(1e6, 1e6);
+            bbox_max = glm::vec2(-1e6, -1e6);
+            positions.clear();
+            texcoords.clear();
+            glm::vec2 pen(0.f);
+
+            for (char c : text) {
+                msdf_font::glyph c_glyph = font.glyphs.at(c);
+                glm::vec2 tl = pen + glm::vec2(c_glyph.xoffset, c_glyph.yoffset);
+                glm::vec2 br = pen + glm::vec2(c_glyph.xoffset, c_glyph.yoffset) + glm::vec2(c_glyph.width, c_glyph.height);
+                glm::vec2 tr = glm::vec2(br.x, tl.y);
+                glm::vec2 bl = glm::vec2(tl.x, br.y);
+                glm::vec2 tl_tc = glm::vec2(c_glyph.x, c_glyph.y) / glm::vec2(texture_width, texture_height);
+                glm::vec2 br_tc = (glm::vec2(c_glyph.x, c_glyph.y) + glm::vec2(c_glyph.width, c_glyph.height)) / glm::vec2(texture_width, texture_height);
+                glm::vec2 tr_tc = glm::vec2(br_tc.x, tl_tc.y);
+                glm::vec2 bl_tc = glm::vec2(tl_tc.x, br_tc.y);
+
+                positions.push_back(tl);
+                texcoords.push_back(tl_tc);
+                positions.push_back(bl);
+                texcoords.push_back(bl_tc);
+                positions.push_back(tr);
+                texcoords.push_back(tr_tc);
+                positions.push_back(tr);
+                texcoords.push_back(tr_tc);
+                positions.push_back(bl);
+                texcoords.push_back(bl_tc);
+                positions.push_back(br);
+                texcoords.push_back(br_tc);
+
+                pen.x += c_glyph.advance;
+            }
+
+            for (glm::vec2 pos : positions) {
+                bbox_min.x = std::min(bbox_min.x, pos.x);
+                bbox_min.y = std::min(bbox_min.y, pos.y);
+                bbox_max.x = std::max(bbox_max.x, pos.x);
+                bbox_max.y = std::max(bbox_max.y, pos.y);
+            }
+
+            std::cout <<
+                "bbox_min.x=" << bbox_min.x << ", "
+                "bbox_min.y=" << bbox_min.y << ", "
+                "bbox_max.x=" << bbox_max.x << ", "
+                "bbox_max.y=" << bbox_max.y <<
+                std::endl;
+            
+            glBindBuffer(GL_ARRAY_BUFFER, vbo_position);
+            glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(glm::vec2), positions.data(), GL_STATIC_DRAW);
+            
+            glBindBuffer(GL_ARRAY_BUFFER, vbo_texcoord);
+            glBufferData(GL_ARRAY_BUFFER, texcoords.size() * sizeof(glm::vec2), texcoords.data(), GL_STATIC_DRAW);
+            
+            text_changed = false;
+        }
+
         auto now = std::chrono::high_resolution_clock::now();
         float dt = std::chrono::duration_cast<std::chrono::duration<float>>(now - last_frame_start).count();
         last_frame_start = now;
+
+        glm::mat4 transform(1.f);
+        transform = glm::scale(transform, glm::vec3(5.f)); // Scale x5
+        transform = glm::translate(transform, glm::vec3(-1.f, 1.f, 0.f)); // Translate to GL coords
+        transform = glm::scale(transform, glm::vec3(2.f / width, -2.f / height, 1.f)); // Scale to GL coords
+        transform = glm::translate(transform, glm::vec3(0.5f * (glm::vec2(width, height) - bbox_max + bbox_min), 0.f)); // Center
 
         glClearColor(0.8f, 0.8f, 1.f, 0.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -225,8 +346,16 @@ int main() try
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+        glUseProgram(msdf_program);
+
+        glUniformMatrix4fv(transform_location, 1, GL_FALSE, reinterpret_cast<float *>(&transform));
+        glUniform1f(sdf_scale_location, font.sdf_scale);
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
+
+        glBindVertexArray(vao);
+        glDrawArrays(GL_TRIANGLES, 0, positions.size());
 
         SDL_GL_SwapWindow(window);
     }

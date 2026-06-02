@@ -56,13 +56,14 @@ uniform mat4 projection;
 layout (location = 0) in vec3 in_position;
 layout (location = 1) in vec3 in_normal;
 layout (location = 2) in vec2 in_texcoord;
+layout (location = 3) in vec3 in_instance;
 
 out vec3 normal;
 out vec2 texcoord;
 
 void main()
 {
-    gl_Position = projection * view * model * vec4(in_position, 1.0);
+    gl_Position = projection * view * model * vec4(in_position + in_instance, 1.0);
     normal = mat3(model) * in_normal;
     texcoord = in_texcoord;
 }
@@ -140,7 +141,7 @@ int main() try
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 16);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
@@ -185,8 +186,9 @@ int main() try
     const std::string model_path = project_root + "/bunny/bunny.gltf";
 
     auto const input_model = load_gltf(model_path);
-    GLuint vbo;
+    GLuint vbo, vbo_inst;
     glGenBuffers(1, &vbo);
+    glGenBuffers(1, &vbo_inst);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, input_model.buffer.size(), input_model.buffer.data(), GL_STATIC_DRAW);
 
@@ -210,6 +212,11 @@ int main() try
         setup_attribute(1, input_model.meshes[i].normal);
         setup_attribute(2, input_model.meshes[i].texcoord);
 
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_inst);
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), reinterpret_cast<void *>(0));
+        glVertexAttribDivisor(3, 1);
+
         vaos.push_back(vao);
     }
 
@@ -232,6 +239,10 @@ int main() try
 
         stbi_image_free(data);
     }
+
+    std::vector<GLuint> queryObjects;
+    std::vector<bool> freeObjects;
+    unsigned int querySize = 0;
 
     auto last_frame_start = std::chrono::high_resolution_clock::now();
 
@@ -281,6 +292,32 @@ int main() try
         if (!paused)
             time += dt;
 
+        unsigned int frameQueryIndex;
+        { // Work with queries
+            int queryIndex = -1;
+            for (unsigned int i = 0; i < querySize; i++) {
+                if (freeObjects[i]) {
+                    queryIndex = i;
+                    break;
+                }
+            }
+            
+            if (queryIndex == -1) {
+                queryIndex = querySize;
+                queryObjects.push_back(0);
+                freeObjects.push_back(true);
+                querySize++;
+            }
+
+            glGenQueries(1, &queryObjects[queryIndex]);
+            freeObjects[queryIndex] = false;
+
+            glBeginQuery(GL_TIME_ELAPSED, queryObjects[queryIndex]);
+
+            frameQueryIndex = queryIndex;
+        }
+
+        // Frame:
         float camera_move_forward = 0.f;
         float camera_move_sideways = 0.f;
 
@@ -328,18 +365,70 @@ int main() try
 
         glm::vec3 light_direction = glm::normalize(glm::vec3(1.f, 2.f, 3.f));
 
-        glUseProgram(program);
-        glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
-        glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
-        glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
-        glUniform3fv(light_direction_location, 1, reinterpret_cast<float *>(&light_direction));
+        std::vector<glm::vec3> instancies[6];
+        { // Work with instancies
+            frustum frustum_obj = frustum(projection * view);
 
-        glBindTexture(GL_TEXTURE_2D, texture);
+            for (int x = -16; x < 16; x++) {
+                for (int y = -16; y < 16; y++) {
+                    glm::vec3 offset = glm::vec3((float) x, 0.f, (float) y);
+                    aabb aabb_obj = aabb(input_model.meshes[0].min + offset, input_model.meshes[0].max + offset);
 
-        {
-            auto const & mesh = input_model.meshes[0];
-            glBindVertexArray(vaos[0]);
-            glDrawElements(GL_TRIANGLES, mesh.indices.count, mesh.indices.type, reinterpret_cast<void *>(mesh.indices.view.offset));
+                    if (intersect(frustum_obj, aabb_obj)) {
+                        float lod_step = 32.f / 6.f;
+                        int lod_index = glm::length(offset - camera_position) / lod_step;
+                        lod_index = std::max(lod_index, 0);
+                        lod_index = std::min(lod_index, 5);
+                        instancies[lod_index].push_back(offset);
+                    }
+                }
+            }
+        }
+
+        for (int lod_level = 0; lod_level < 6; lod_level++) {
+            glBindBuffer(GL_ARRAY_BUFFER, vbo_inst);
+            glBufferData(GL_ARRAY_BUFFER, instancies[lod_level].size() * sizeof(glm::vec3), instancies[lod_level].data(), GL_STATIC_DRAW);
+
+            glUseProgram(program);
+            glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
+            glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
+            glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
+            glUniform3fv(light_direction_location, 1, reinterpret_cast<float *>(&light_direction));
+    
+            glBindTexture(GL_TEXTURE_2D, texture);
+    
+            {
+                auto const & mesh = input_model.meshes[lod_level];
+                glBindVertexArray(vaos[lod_level]);
+                glDrawElementsInstanced(GL_TRIANGLES, mesh.indices.count, mesh.indices.type, reinterpret_cast<void *>(mesh.indices.view.offset), instancies[lod_level].size());
+            }
+        }
+
+        { // Work with queries
+            glEndQuery(GL_TIME_ELAPSED);
+
+            for (unsigned int i = 0; i < querySize; i++) {
+                if (!freeObjects[i]) {
+                    GLint result;
+                    glGetQueryObjectiv(queryObjects[i], GL_QUERY_RESULT_AVAILABLE, &result);
+
+                    if (result == GL_TRUE) {
+                        glGetQueryObjectiv(queryObjects[i], GL_QUERY_RESULT, &result);
+                        freeObjects[i] = true;
+
+                        std::cout << 
+                            result / 1e6 << " ms, " << 
+                            1e9 / result << " fps, " << 
+                            instancies[0].size() << "/" <<
+                            instancies[1].size() << "/" <<
+                            instancies[2].size() << "/" <<
+                            instancies[3].size() << "/" <<
+                            instancies[4].size() << "/" <<
+                            instancies[5].size() << " inst" << 
+                            std::endl;
+                    }
+                }
+            }
         }
 
         SDL_GL_SwapWindow(window);
