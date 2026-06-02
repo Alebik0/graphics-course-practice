@@ -72,6 +72,7 @@ uniform vec3 camera_position;
 uniform vec3 light_direction;
 uniform vec3 bbox_min;
 uniform vec3 bbox_max;
+uniform sampler3D texture_sampler;
 
 layout (location = 0) out vec4 out_color;
 
@@ -111,9 +112,59 @@ const float PI = 3.1415926535;
 
 in vec3 position;
 
+vec3 texcoord(vec3 p) {
+    return (p - bbox_min) / (bbox_max - bbox_min);
+}
+
 void main()
 {
-    out_color = vec4(1.0, 0.5, 0.5, 1.0);
+    const vec3 absorption = vec3(0.0);
+    const vec3 scattering = vec3(1.0, 4.0, 8.0);
+    const vec3 extinction = absorption + scattering;
+
+    vec3 camera_out = normalize(-camera_position + position);
+    vec2 intersection = intersect_bbox(camera_position, camera_out);
+    float tmin = max(intersection.x, 0.0);
+    float tmax = intersection.y;
+    vec3 light_color = vec3(16.0);
+    vec3 color = vec3(0.0);
+    vec3 ambient_light = 4.0 * vec3(0.6, 0.8, 1.0);
+
+    vec3 optical_depth = vec3(0.0);
+    int N = 64;
+    int M = 16;
+    
+    for (int i = 0; i < N; i++) {
+        float dt = (tmax - tmin) / N;
+        float t = tmin + (i + 0.5) * dt;
+        vec3 p = camera_position + t * camera_out;
+        float density = texture(texture_sampler, texcoord(p)).r;
+        optical_depth += extinction * density * dt;
+
+        vec3 light_optical_depth = vec3(0.0);
+        vec2 light_intersection = intersect_bbox(p, light_direction);
+        float light_tmin = max(light_intersection.x, 0.0);
+        float light_tmax = light_intersection.y;
+        
+        for (int j = 0; j < M; j++) {
+            float light_dt = (light_tmax - light_tmin) / M;
+            float light_t = light_tmin + (j + 0.5) * light_dt;
+            vec3 light_p = p + light_t * light_direction;
+            float light_density = texture(texture_sampler, texcoord(light_p)).r;
+            light_optical_depth += extinction * light_density * light_dt;
+        }
+
+        color += (light_color * exp(-light_optical_depth) + ambient_light) *
+            exp(-optical_depth) * dt * density *
+            scattering / 4.0 / PI;
+    }
+
+    vec3 opacity = 1.0 - exp(-optical_depth);
+
+    vec3 ambient_color = vec3(0.8f, 0.8f, 0.9f); // Same as glClear color
+    color = mix(ambient_color, color, opacity);
+
+    out_color = vec4(color, 1.0);
 }
 )";
 
@@ -236,6 +287,7 @@ int main() try
     GLuint bbox_max_location = glGetUniformLocation(program, "bbox_max");
     GLuint camera_position_location = glGetUniformLocation(program, "camera_position");
     GLuint light_direction_location = glGetUniformLocation(program, "light_direction");
+    GLuint texture_sampler_location = glGetUniformLocation(program, "texture_sampler");
 
     GLuint vao, vbo, ebo;
     glGenVertexArrays(1, &vao);
@@ -254,6 +306,26 @@ int main() try
 
     const std::string project_root = PROJECT_ROOT;
     const std::string cloud_data_path = project_root + "/cloud.data";
+    GLuint cubeTexture;
+
+    { // Make texture
+        const int width = 128;
+        const int height = 64;
+        const int depth = 64;
+        std::vector<char> pixels(width * height * depth);
+        std::ifstream input(cloud_data_path, std::ios::binary);
+        input.read(pixels.data(), pixels.size());
+
+        glGenTextures(1, &cubeTexture);
+        glBindTexture(GL_TEXTURE_3D, cubeTexture);
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, width, height, depth, 0, GL_RED, GL_UNSIGNED_BYTE, pixels.data());
+    }
 
     const glm::vec3 cloud_bbox_min{-2.f, -1.f, -1.f};
     const glm::vec3 cloud_bbox_max{ 2.f,  1.f,  1.f};
@@ -357,6 +429,10 @@ int main() try
         glUniform3fv(bbox_max_location, 1, reinterpret_cast<const float *>(&cloud_bbox_max));
         glUniform3fv(camera_position_location, 1, reinterpret_cast<float *>(&camera_position));
         glUniform3fv(light_direction_location, 1, reinterpret_cast<float *>(&light_direction));
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_3D, cubeTexture);
+        glUniform1f(texture_sampler_location, 1);
 
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, std::size(cube_indices), GL_UNSIGNED_INT, nullptr);

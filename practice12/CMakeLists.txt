@@ -24,6 +24,8 @@ set(TARGET_NAME "${PROJECT_NAME}")
 
 set(PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 
+add_subdirectory(glm)
+
 add_executable(${TARGET_NAME} main.cpp obj_parser.hpp obj_parser.cpp stb_image.h stb_image.c)
 target_include_directories(${TARGET_NAME} PUBLIC
 	"${SDL2_INCLUDE_DIRS}"
@@ -31,6 +33,7 @@ target_include_directories(${TARGET_NAME} PUBLIC
 	"${OPENGL_INCLUDE_DIRS}"
 )
 target_link_libraries(${TARGET_NAME} PUBLIC
+	glm
 	"${GLEW_LIBRARIES}"
 	"${SDL2_LIBRARIES}"
 	"${OPENGL_LIBRARIES}"
