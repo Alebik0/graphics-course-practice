@@ -51,20 +51,29 @@ R"(#version 330 core
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat4x3 bones[100];
 
 layout (location = 0) in vec3 in_position;
 layout (location = 1) in vec3 in_normal;
 layout (location = 2) in vec2 in_texcoord;
+layout (location = 3) in ivec4 in_joints;
+layout (location = 4) in vec4 in_weights;
 
 out vec3 normal;
 out vec2 texcoord;
+out vec4 weights;
 
 void main()
 {
-
-    gl_Position = projection * view * model * vec4(in_position, 1.0);
-    normal = mat3(model) * in_normal;
+    mat4x3 bone1 = bones[in_joints.x];
+    mat4x3 bone2 = bones[in_joints.y];
+    mat4x3 bone3 = bones[in_joints.z];
+    mat4x3 bone4 = bones[in_joints.w];
+    mat4x3 average = (bone1 * in_weights.x + bone2 * in_weights.y + bone3 * in_weights.z + bone4 * in_weights.w) / (in_weights.x + in_weights.y + in_weights.z + in_weights.w);
+    gl_Position = projection * view * model * mat4(average) * vec4(in_position, 1.0);
+    normal = mat3(model) * mat3(average) * in_normal;
     texcoord = in_texcoord;
+    weights = in_weights;
 }
 )";
 
@@ -81,6 +90,7 @@ layout (location = 0) out vec4 out_color;
 
 in vec3 normal;
 in vec2 texcoord;
+in vec4 weights;
 
 void main()
 {
@@ -137,6 +147,14 @@ GLuint create_program(Shaders ... shaders)
     return result;
 }
 
+struct animation_translation {
+    std::string old_animation;
+    std::string new_animation;
+    float current_time;
+    float translation_time;
+    bool active;
+};
+
 int main() try
 {
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
@@ -147,7 +165,7 @@ int main() try
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 16);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
@@ -186,7 +204,8 @@ int main() try
     GLuint color_location = glGetUniformLocation(program, "color");
     GLuint use_texture_location = glGetUniformLocation(program, "use_texture");
     GLuint light_direction_location = glGetUniformLocation(program, "light_direction");
-
+    GLuint bones_location = glGetUniformLocation(program, "bones");
+    
     const std::string project_root = PROJECT_ROOT;
     const std::string model_path = project_root + "/dancing/dancing.gltf";
 
@@ -271,6 +290,10 @@ int main() try
     float camera_rotation = 0.f;
     float camera_height = 1.f;
 
+    std::string animation_name = "hip-hop";
+    animation_translation translation;
+    translation.active = false;
+
     bool paused = false;
 
     bool running = true;
@@ -325,6 +348,35 @@ int main() try
         if (button_down[SDLK_s])
             view_angle += 2.f * dt;
 
+
+        if (button_down[SDLK_1] && !translation.active) {
+            translation.old_animation = animation_name;
+            translation.new_animation = "hip-hop";
+            translation.current_time = time;
+            translation.translation_time = 0.5f;
+            translation.active = true;
+
+            animation_name = "hip-hop";
+        }
+        if (button_down[SDLK_2] && !translation.active) {
+            translation.old_animation = animation_name;
+            translation.new_animation = "rumba";
+            translation.current_time = time;
+            translation.translation_time = 0.5f;
+            translation.active = true;
+
+            animation_name = "rumba";
+        }
+        if (button_down[SDLK_3] && !translation.active) {
+            translation.old_animation = animation_name;
+            translation.new_animation = "flair";
+            translation.current_time = time;
+            translation.translation_time = 0.5f;
+            translation.active = true;
+
+            animation_name = "flair";
+        }
+
         glClearColor(0.8f, 0.8f, 1.f, 0.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -335,7 +387,7 @@ int main() try
         float near = 0.1f;
         float far = 100.f;
 
-        glm::mat4 model = glm::scale(glm::mat4(1.f), glm::vec3(1.f));
+        glm::mat4 model = glm::scale(glm::mat4(1.f), glm::vec3(0.01f));
 
         glm::mat4 view(1.f);
         view = glm::translate(view, {0.f, 0.f, -camera_distance});
@@ -349,11 +401,88 @@ int main() try
 
         glm::vec3 light_direction = glm::normalize(glm::vec3(1.f, 2.f, 3.f));
 
+        const int bones_amount = input_model.bones.size();
+        std::vector<glm::mat4x3> bones(bones_amount);
+        if (translation.active) {
+            const gltf_model::animation & old_bones_animation = input_model.animations.at(translation.old_animation);
+            const gltf_model::animation & new_bones_animation = input_model.animations.at(translation.new_animation);
+            float old_frame_start = std::fmod(translation.current_time, old_bones_animation.max_time);
+            float new_frame_start = std::fmod(translation.current_time, new_bones_animation.max_time);
+            float delta_time = time - translation.current_time;
+            float max_time = translation.translation_time;
+            float old_frame = std::fmod(old_frame_start + delta_time, old_bones_animation.max_time);
+            float new_frame = std::fmod(new_frame_start + delta_time, new_bones_animation.max_time);
+            
+            if (delta_time > max_time) {
+                translation.active = false;
+            } else {
+                for (int i = 0; i < bones_amount; i++) {
+                    glm::mat4 transform;
+                    {
+                        gltf_model::bone_animation old_bone_animation = old_bones_animation.bones[i];
+                        gltf_model::bone_animation new_bone_animation = new_bones_animation.bones[i];
+
+                        auto old_translation = old_bone_animation.translation(old_frame);
+                        auto old_rotation = old_bone_animation.rotation(old_frame);
+                        auto old_scale = old_bone_animation.scale(old_frame);
+                        auto new_translation = new_bone_animation.translation(new_frame);
+                        auto new_rotation = new_bone_animation.rotation(new_frame);
+                        auto new_scale = new_bone_animation.scale(new_frame);
+    
+                        glm::mat4 translation = glm::translate(glm::mat4(1.f), glm::lerp(old_translation, new_translation, delta_time / max_time));
+                        glm::mat4 rotation = glm::toMat4(glm::slerp(old_rotation, new_rotation, delta_time / max_time));
+                        glm::mat4 scale = glm::scale(glm::mat4(1.f), glm::lerp(old_scale, new_scale, delta_time / max_time));
+    
+                        transform = translation * rotation * scale;
+                    }
+        
+                    if (input_model.bones[i].parent != -1) {
+                        glm::mat4x3 parent_transform = bones[input_model.bones[i].parent];
+                        transform = parent_transform * transform;
+                    }
+        
+                    bones[i] = transform;
+                }
+        
+                for (int i = 0; i < bones_amount; i++) {
+                    bones[i] = bones[i] * input_model.bones[i].inverse_bind_matrix;
+                }
+            }
+        }
+        
+        if (!translation.active) {
+            gltf_model::animation bones_animation = input_model.animations.at(animation_name);
+    
+            for (int i = 0; i < bones_amount; i++) {
+                glm::mat4 transform;
+                {
+                    float frame = std::fmod(time, bones_animation.max_time);
+                    gltf_model::bone_animation bone_animation = bones_animation.bones[i];
+                    glm::mat4 translation = glm::translate(glm::mat4(1.f), bone_animation.translation(frame));
+                    glm::mat4 rotation = glm::toMat4(bone_animation.rotation(frame));
+                    glm::mat4 scale = glm::scale(glm::mat4(1.f), bone_animation.scale(frame));
+                    transform = translation * rotation * scale;
+                }
+    
+                if (input_model.bones[i].parent != -1) {
+                    glm::mat4x3 parent_transform = bones[input_model.bones[i].parent];
+                    transform = parent_transform * transform;
+                }
+    
+                bones[i] = transform;
+            }
+    
+            for (int i = 0; i < bones_amount; i++) {
+                bones[i] = bones[i] * input_model.bones[i].inverse_bind_matrix;
+            }
+        }
+
         glUseProgram(program);
         glUniformMatrix4fv(model_location, 1, GL_FALSE, reinterpret_cast<float *>(&model));
         glUniformMatrix4fv(view_location, 1, GL_FALSE, reinterpret_cast<float *>(&view));
         glUniformMatrix4fv(projection_location, 1, GL_FALSE, reinterpret_cast<float *>(&projection));
         glUniform3fv(light_direction_location, 1, reinterpret_cast<float *>(&light_direction));
+        glUniformMatrix4x3fv(bones_location, input_model.bones.size(), GL_FALSE, reinterpret_cast<float *>(bones.data()));
 
         auto draw_meshes = [&](bool transparent)
         {
