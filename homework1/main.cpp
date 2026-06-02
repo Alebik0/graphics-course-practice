@@ -378,7 +378,7 @@ int main() try
             }
             
             buttonClickChecked = true;
-        } else if (button_down[SDLK_DOWN]) {
+        } else if (button_down[SDLK_LEFT]) {
             if (!buttonClickChecked) {
                 W = std::max(W - DETALISATION_STEP, DETALISATION_STEP);
                 H = std::max(H - DETALISATION_STEP, DETALISATION_STEP);
